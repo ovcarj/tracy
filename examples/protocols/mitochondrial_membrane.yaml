@@ -1,24 +1,36 @@
-# Tracy example protocol: mitochondrial membrane
+# Tracy example protocol: mitochondrial inner membrane
 #
-# Copy this file and adjust the parameters for your specific system.
+# Copy and adjust for your system.  For the full list of available
+# parameters see tracy/protocols/charmm_gui/mitochondrial_membrane.yaml.
 
 system:
-  name: mitochondrial_membrane_test
+  name: mitochondrial_inner_membrane
   description: >-
-    Test mitochondrial inner membrane system submitted via tracy.
+    Asymmetric cardiolipin-containing bilayer representative of the
+    mitochondrial inner membrane.
 
 charmm_gui:
   module: membrane_builder
 
   quick_bilayer:
-    # Use a CHARMM-GUI preset membrane type.
-    # PMm = plasma membrane (mammalian) — adjust to the correct preset.
-    membtype: PMm
+    # Custom asymmetric composition.
+    # Format: "LIP1:LIP2:LIP3=ratio1:ratio2:ratio3"
+    # Use membtype (e.g. membtype: PMm) instead for a preset system.
+    upper: "POPE:POPC:CDL2=40:40:20"
+    lower: "POPE:POPC:CDL2=45:35:20"
+
     membrane_only: true
-    margin: 20.0
-    wdist: 22.5
-    ion_conc: 0.15
+
+    margin: 20.0      # box boundary margin in Å
+    wdist: 22.5       # water layer thickness per side in Å
+
+    ion_conc: 0.15    # M
     ion_type: NaCl
+
+    run_ff_converter: true    # produce GROMACS/AMBER/NAMD/OpenMM files
+    temperature: 310.15       # K
+
+    charmmff_hmr_checked: true   # hydrogen mass repartitioning (4 fs timestep)
 
 tracy:
   expected_engine: gromacs

@@ -1,45 +1,111 @@
-# Tracy protocol: mitochondrial membrane example
+# Tracy protocol: mitochondrial inner membrane
 #
-# This file is a scaffold for a mitochondrial inner-membrane system built
-# through CHARMM-GUI Quick Bilayer.  Scientific parameters (lipid ratios,
-# box size, ion concentration) are illustrative only and should be adjusted
-# to match the specific system you are modelling.
+# Reference protocol for a cardiolipin-containing asymmetric bilayer
+# representative of the mitochondrial inner membrane (IMM).
 #
-# Once aiida-charmm-gui input requirements are confirmed against the live
-# API, fill in the `charmm_gui.quick_bilayer` section with the correct keys.
+# The IMM is enriched in phosphatidylethanolamine (~40 mol%),
+# phosphatidylcholine (~40 mol%), and cardiolipin (~15-20 mol%), with
+# negligible cholesterol.  Lipid ratios here are illustrative; consult
+# primary literature for the composition relevant to your organism and
+# experimental context.
+#
+# All quick_bilayer parameters correspond to inputs of
+# QuickBilayerWorkChain in aiida-charmm-gui.  Parameters that map
+# directly to the CHARMM-GUI Quick Bilayer API are noted.
 
 system:
-  name: mitochondrial_membrane_example
+  name: mitochondrial_inner_membrane
   description: >-
-    Example mitochondrial inner membrane system for tracy development.
-    Cardiolipin-containing asymmetric bilayer in NaCl solution.
+    Asymmetric cardiolipin-containing bilayer representative of the
+    mitochondrial inner membrane.  Built via CHARMM-GUI Quick Bilayer
+    with the CHARMM36 force field and GROMACS output.
 
 charmm_gui:
   module: membrane_builder
 
   quick_bilayer:
-    # Lipid composition: use either membtype (preset) OR upper+lower (custom).
+
+    # ------------------------------------------------------------------
+    # Lipid composition
+    # ------------------------------------------------------------------
+    # Two mutually exclusive options:
     #
-    # Preset example:
+    # Option A — CHARMM-GUI preset membrane type (API field: membtype).
+    # Available presets include: PMm (plasma membrane mammalian),
+    # PMf (fungal), PMp (plant), ENDm (endosomal), aPM (asymmetric PM).
+    # No preset exists for the IMM; use Option B for custom composition.
+    #
     #   membtype: PMm
     #
-    # Custom asymmetric bilayer example (CL = cardiolipin, POPE, POPC):
-    #   upper: "POPE:POPC:CHL1=3:1:1"
-    #   lower: "POPE:POPC:CL=3:1:1"
-    #
-    # TODO: confirm exact lipid name strings accepted by the Quick Bilayer API.
-    membtype: PMm
+    # Option B — custom asymmetric composition (API fields: upper, lower).
+    # Format: "LIP1:LIP2:LIP3=ratio1:ratio2:ratio3"
+    # CHARMM36 lipid names (examples): POPE, POPC, POPS, POPI, CDL2
+    # (cardiolipin), CHL1 (cholesterol), DPPC, DPPS, NSM (sphingomyelin).
+    # Verify names against the CHARMM-GUI lipid library before submitting.
+    upper: "POPE:POPC:CDL2=40:40:20"
+    lower: "POPE:POPC:CDL2=45:35:20"
 
-    # Membrane-only system (no protein).
+    # ------------------------------------------------------------------
+    # System type
+    # ------------------------------------------------------------------
+    # membrane_only: true  — no protein; jobid_pdb not required.
+    # membrane_only: false — embed a protein; provide jobid_pdb.
     membrane_only: true
+    # jobid_pdb: "XXXXXXXX"   # job ID from CHARMM-GUI PDB Reader module
 
+    # ------------------------------------------------------------------
     # Box geometry
-    margin: 20.0      # boundary margin in Å
-    wdist: 22.5       # water layer thickness in Å
+    # ------------------------------------------------------------------
+    margin: 20.0     # distance from membrane edge to box boundary in Å
+    wdist: 22.5      # water layer thickness per side in Å
 
-    # Solvent ions
-    ion_conc: 0.15    # concentration in M
-    ion_type: NaCl
+    # ------------------------------------------------------------------
+    # Solvent and ions  (API fields: Ion_conc, Ion_type)
+    # ------------------------------------------------------------------
+    ion_conc: 0.15   # ion concentration in M
+    ion_type: NaCl   # NaCl or KCl
+
+    # ------------------------------------------------------------------
+    # Force-field converter
+    # ------------------------------------------------------------------
+    # Runs the CHARMM-GUI ff converter after membrane construction,
+    # producing input files for GROMACS, AMBER, NAMD, and OpenMM
+    # in addition to the default CHARMM output.
+    # API field: run_ffconverter.  Default: true.
+    run_ff_converter: true
+
+    # Temperature used by the ff converter when generating MD input
+    # files (NpT reference temperature, thermostat target).  In K.
+    # Default: 303.15.  Physiological: 310.15.
+    temperature: 310.15
+
+    # ------------------------------------------------------------------
+    # CHARMM force-field options
+    # ------------------------------------------------------------------
+    # Hydrogen mass repartitioning — transfers mass from heavy atoms to
+    # bonded hydrogens, allowing a 4 fs MD timestep.  Recommended for
+    # equilibration and production runs.  API field: charmmff_hmr_checked.
+    charmmff_hmr_checked: true
+
+    # WYF patch for Trp/Tyr/Phe aromatic residues in protein systems.
+    # Has no effect on pure-lipid systems.  API field: charmmff_wyf_checked.
+    charmmff_wyf_checked: false
+
+    # Run a short CHARMM energy minimisation before invoking the
+    # ff converter.  API field: charmm_mini.  Default: false.
+    charmm_mini: false
+
+    # ------------------------------------------------------------------
+    # Advanced / rarely changed
+    # ------------------------------------------------------------------
+    topology_in: true           # include N-terminal patch  (API: topologyIn)
+    heteroatoms: false          # include heteroatoms from PDB  (API: heteroatoms)
+    clone_job: false            # clone job for multi-composition runs  (API: clone_job)
+    ppm: false                  # use PPM for protein positioning  (API: ppm)
+    prot_projection_upper: false  # protein projection on upper leaflet
+    prot_projection_lower: false  # protein projection on lower leaflet
+    align_option: 1             # protein alignment method  (API: align_option)
+    hetero_xy_option: margin    # XY box size rule for heteroatoms  (API: hetero_xy_option)
 
 tracy:
   expected_engine: gromacs
