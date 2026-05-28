@@ -1,0 +1,48 @@
+# Tracy protocol: mitochondrial membrane example
+#
+# This file is a scaffold for a mitochondrial inner-membrane system built
+# through CHARMM-GUI Quick Bilayer.  Scientific parameters (lipid ratios,
+# box size, ion concentration) are illustrative only and should be adjusted
+# to match the specific system you are modelling.
+#
+# Once aiida-charmm-gui input requirements are confirmed against the live
+# API, fill in the `charmm_gui.quick_bilayer` section with the correct keys.
+
+system:
+  name: mitochondrial_membrane_example
+  description: >-
+    Example mitochondrial inner membrane system for tracy development.
+    Cardiolipin-containing asymmetric bilayer in NaCl solution.
+
+charmm_gui:
+  module: membrane_builder
+
+  quick_bilayer:
+    # Lipid composition: use either membtype (preset) OR upper+lower (custom).
+    #
+    # Preset example:
+    #   membtype: PMm
+    #
+    # Custom asymmetric bilayer example (CL = cardiolipin, POPE, POPC):
+    #   upper: "POPE:POPC:CHL1=3:1:1"
+    #   lower: "POPE:POPC:CL=3:1:1"
+    #
+    # TODO: confirm exact lipid name strings accepted by the Quick Bilayer API.
+    membtype: PMm
+
+    # Membrane-only system (no protein).
+    membrane_only: true
+
+    # Box geometry
+    margin: 20.0      # boundary margin in Å
+    wdist: 22.5       # water layer thickness in Å
+
+    # Solvent ions
+    ion_conc: 0.15    # concentration in M
+    ion_type: NaCl
+
+tracy:
+  expected_engine: gromacs
+  membrane_normal_axis: z
+  require_gromacs_files: true
+  output_interface_version: "0.1"
