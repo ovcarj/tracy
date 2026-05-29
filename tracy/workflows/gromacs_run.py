@@ -13,19 +13,20 @@ class GromacsRunWorkChain(WorkChain):
     """Run a single GROMACS grompp + mdrun pair.
 
     Generic and reusable — knows nothing about membranes or CHARMM-GUI.
-    Output filenames are derived from the MDP stem so stored nodes are
-    identifiable in the AiiDA provenance graph.
+    Output filenames are prefixed with ``output_prefix`` (defaults to the MDP
+    file stem) so stored nodes are identifiable in the AiiDA provenance graph.
 
     Inputs
     ------
-    structure    : SinglefileData  — input .gro structure
-    topology     : SinglefileData  — topol.top
-    toppar       : FolderData      — toppar/ force-field directory
-    mdp_file     : SinglefileData  — .mdp parameter file
-    index_file   : SinglefileData  — .ndx index file (optional)
-    checkpoint   : SinglefileData  — .cpt continuation checkpoint (optional)
-    gromacs_code : AbstractCode    — registered gmx code
-    options      : Dict            — scheduler resource options (optional)
+    structure     : SinglefileData  — input .gro structure
+    topology      : SinglefileData  — topol.top
+    toppar        : FolderData      — toppar/ force-field directory
+    mdp_file      : SinglefileData  — .mdp parameter file
+    index_file    : SinglefileData  — .ndx index file (optional)
+    checkpoint    : SinglefileData  — .cpt continuation checkpoint (optional)
+    gromacs_code  : AbstractCode    — registered gmx code
+    options       : Dict            — scheduler resource options (optional)
+    output_prefix : Str             — filename prefix for outputs (optional)
 
     Outputs
     -------
@@ -44,10 +45,12 @@ class GromacsRunWorkChain(WorkChain):
         spec.input("topology",     valid_type=orm.SinglefileData)
         spec.input("toppar",       valid_type=orm.FolderData)
         spec.input("mdp_file",     valid_type=orm.SinglefileData)
-        spec.input("index_file",   valid_type=orm.SinglefileData, required=False)
-        spec.input("checkpoint",   valid_type=orm.SinglefileData, required=False)
-        spec.input("gromacs_code", valid_type=orm.AbstractCode)
-        spec.input("options",      valid_type=orm.Dict, required=False)
+        spec.input("index_file",    valid_type=orm.SinglefileData, required=False)
+        spec.input("checkpoint",    valid_type=orm.SinglefileData, required=False)
+        spec.input("gromacs_code",  valid_type=orm.AbstractCode)
+        spec.input("options",       valid_type=orm.Dict, required=False)
+        spec.input("output_prefix", valid_type=orm.Str,  required=False,
+                   help="Prefix for output filenames. Defaults to the MDP file stem.")
 
         spec.outline(
             cls.setup,
@@ -69,17 +72,18 @@ class GromacsRunWorkChain(WorkChain):
         GromppParameters = DataFactory("gromacs.grompp")
         MdrunParameters  = DataFactory("gromacs.mdrun")
 
-        stem = Path(self.inputs.mdp_file.filename).stem
-        self.ctx.step_stem = stem
+        mdp_stem = Path(self.inputs.mdp_file.filename).stem
+        prefix = self.inputs.output_prefix.value if "output_prefix" in self.inputs else mdp_stem
+        self.ctx.step_stem = prefix
 
-        self.ctx.grompp_params = GromppParameters(dict={"o": f"{stem}.tpr"})
+        self.ctx.grompp_params = GromppParameters(dict={"o": f"{prefix}.tpr"})
         self.ctx.mdrun_params = MdrunParameters(dict={
-            "c": f"{stem}_out.gro",
-            "e": f"{stem}.edr",
-            "g": f"{stem}.log",
-            "o": f"{stem}.trr",
+            "c": f"{prefix}.gro",
+            "e": f"{prefix}.edr",
+            "g": f"{prefix}.log",
+            "o": f"{prefix}.trr",
         })
-        self.report(f"GromacsRunWorkChain setup: step={stem}")
+        self.report(f"GromacsRunWorkChain setup: step={prefix}")
 
     def run_grompp(self):
         GromppCalculation = CalculationFactory("gromacs.grompp")

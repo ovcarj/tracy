@@ -101,11 +101,12 @@ class RunMembraneMDWorkChain(WorkChain):
             engine_wc = GromacsRunWorkChain
 
         inputs: dict = {
-            "structure":    self.ctx.run_inputs["structure"],
-            "topology":     self.ctx.run_inputs["topology"],
-            "toppar":       self.ctx.run_inputs["toppar"],
-            "mdp_file":     mdp_file,
-            "gromacs_code": self.inputs.code,
+            "structure":     self.ctx.run_inputs["structure"],
+            "topology":      self.ctx.run_inputs["topology"],
+            "toppar":        self.ctx.run_inputs["toppar"],
+            "mdp_file":      mdp_file,
+            "gromacs_code":  self.inputs.code,
+            "output_prefix": orm.Str(step["name"]),
         }
         if "index" in self.ctx.run_inputs:
             inputs["index_file"] = self.ctx.run_inputs["index"]

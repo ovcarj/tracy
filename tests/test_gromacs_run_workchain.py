@@ -74,6 +74,11 @@ def test_options_is_optional():
     assert port.required is False
 
 
+def test_output_prefix_is_optional():
+    port = GromacsRunWorkChain.spec().inputs["output_prefix"]
+    assert port.required is False
+
+
 # ---------------------------------------------------------------------------
 # Outputs
 # ---------------------------------------------------------------------------
@@ -97,6 +102,17 @@ def test_has_energy_output():
 def test_has_log_output():
     port = GromacsRunWorkChain.spec().outputs["log"]
     assert issubclass(port.valid_type, orm.SinglefileData)
+
+
+def test_has_tpr_file_output():
+    port = GromacsRunWorkChain.spec().outputs["tpr_file"]
+    assert port.required is True
+    assert issubclass(port.valid_type, orm.SinglefileData)
+
+
+def test_has_trajectory_compressed_output():
+    port = GromacsRunWorkChain.spec().outputs["trajectory_compressed"]
+    assert port.required is False
 
 
 def test_checkpoint_output_is_optional():
