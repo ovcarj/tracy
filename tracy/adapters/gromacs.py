@@ -13,6 +13,8 @@ from collections import defaultdict
 from pathlib import Path
 
 from aiida import orm
+from aiida.engine import calcfunction
+from aiida.plugins import CalculationFactory
 
 _MDP_RE = re.compile(r"^step(\d+)(?:\.(\d+))?_([^.]+)\.mdp$")
 
@@ -114,3 +116,71 @@ def prepare_gromacs_run_inputs(bundle: orm.FolderData) -> dict:
             result["index"] = orm.SinglefileData(file=str(ndx))
 
         return result
+
+
+# ---------------------------------------------------------------------------
+# MDP utilities
+# ---------------------------------------------------------------------------
+
+def read_mdp_param(mdp_file: orm.SinglefileData, key: str, default: str = "") -> str:
+    """Return the value of a single MDP key, or *default* if not found.
+
+    Key matching is case-insensitive and treats hyphens and underscores as
+    equivalent (GROMACS accepts both).
+    """
+    key_norm = key.strip().lower().replace("-", "_")
+    with mdp_file.open(mode="r") as fh:
+        for line in fh:
+            code = line.split(";")[0]
+            if "=" not in code:
+                continue
+            k, _, v = code.partition("=")
+            if k.strip().lower().replace("-", "_") == key_norm:
+                return v.strip()
+    return default
+
+
+def _apply_mdp_overrides(content: str, overrides: dict) -> str:
+    """Return MDP content with key-value pairs replaced or appended."""
+    lines = content.splitlines()
+    patched: list[str] = []
+    applied: set[str] = set()
+
+    for line in lines:
+        comment_pos = line.find(";")
+        code = line[:comment_pos] if comment_pos >= 0 else line
+        tail = line[comment_pos:] if comment_pos >= 0 else ""
+
+        if "=" in code:
+            raw_key = code.split("=")[0].strip()
+            key_norm = raw_key.lower().replace("-", "_")
+            for ov_key, ov_val in overrides.items():
+                if ov_key.lower().replace("-", "_") == key_norm:
+                    patched.append(f"{raw_key} = {ov_val}{tail}")
+                    applied.add(ov_key)
+                    break
+            else:
+                patched.append(line)
+        else:
+            patched.append(line)
+
+    for key, val in overrides.items():
+        if key not in applied:
+            patched.append(f"{key} = {val}")
+
+    return "\n".join(patched)
+
+
+@calcfunction
+def patch_mdp(mdp_file: orm.SinglefileData, overrides: orm.Dict) -> orm.SinglefileData:
+    """Apply key-value overrides to a GROMACS MDP file, preserving provenance.
+
+    Keys are matched case-insensitively with hyphens/underscores treated as
+    equivalent.  Existing keys have their values replaced; keys not present in
+    the original are appended at the end.
+    """
+    import io
+    with mdp_file.open(mode="r") as fh:
+        content = fh.read()
+    patched = _apply_mdp_overrides(content, overrides.get_dict())
+    return orm.SinglefileData(io.BytesIO(patched.encode()), filename=mdp_file.filename)

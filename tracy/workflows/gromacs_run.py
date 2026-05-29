@@ -30,11 +30,13 @@ class GromacsRunWorkChain(WorkChain):
 
     Outputs
     -------
-    output_structure : SinglefileData — .gro from mdrun
-    trajectory       : SinglefileData — .trr from mdrun
-    energy           : SinglefileData — .edr from mdrun
-    log              : SinglefileData — .log from mdrun
-    checkpoint       : SinglefileData — .cpt from mdrun (optional)
+    output_structure     : SinglefileData — .gro from mdrun
+    trajectory           : SinglefileData — .trr from mdrun
+    energy               : SinglefileData — .edr from mdrun
+    log                  : SinglefileData — .log from mdrun
+    tpr_file             : SinglefileData — .tpr from grompp
+    trajectory_compressed: SinglefileData — .xtc when nstxout-compressed > 0 (optional)
+    checkpoint           : SinglefileData — .cpt for dynamics steps (optional)
     """
 
     @classmethod
@@ -59,16 +61,19 @@ class GromacsRunWorkChain(WorkChain):
             cls.results,
         )
 
-        spec.output("output_structure", valid_type=orm.SinglefileData)
-        spec.output("trajectory",       valid_type=orm.SinglefileData)
-        spec.output("energy",           valid_type=orm.SinglefileData)
-        spec.output("log",              valid_type=orm.SinglefileData)
-        spec.output("checkpoint",       valid_type=orm.SinglefileData, required=False)
+        spec.output("output_structure",      valid_type=orm.SinglefileData)
+        spec.output("trajectory",            valid_type=orm.SinglefileData)
+        spec.output("energy",                valid_type=orm.SinglefileData)
+        spec.output("log",                   valid_type=orm.SinglefileData)
+        spec.output("tpr_file",              valid_type=orm.SinglefileData)
+        spec.output("trajectory_compressed", valid_type=orm.SinglefileData, required=False)
+        spec.output("checkpoint",            valid_type=orm.SinglefileData, required=False)
 
         spec.exit_code(300, "ERROR_GROMPP_FAILED", message="grompp calculation failed.")
         spec.exit_code(301, "ERROR_MDRUN_FAILED",  message="mdrun calculation failed.")
 
     def setup(self) -> None:
+        from tracy.adapters.gromacs import read_mdp_param
         GromppParameters = DataFactory("gromacs.grompp")
         MdrunParameters  = DataFactory("gromacs.mdrun")
 
@@ -76,14 +81,28 @@ class GromacsRunWorkChain(WorkChain):
         prefix = self.inputs.output_prefix.value if "output_prefix" in self.inputs else mdp_stem
         self.ctx.step_stem = prefix
 
+        integrator = read_mdp_param(self.inputs.mdp_file, "integrator", default="md").lower()
+        is_minimization = integrator in {"steep", "cg", "l-bfgs"}
+        nstxtc = int(read_mdp_param(self.inputs.mdp_file, "nstxout-compressed", default="0"))
+
+        self.ctx.write_cpt = not is_minimization
+        self.ctx.write_xtc = nstxtc > 0
+
         self.ctx.grompp_params = GromppParameters(dict={"o": f"{prefix}.tpr"})
-        self.ctx.mdrun_params = MdrunParameters(dict={
+
+        mdrun_dict = {
             "c": f"{prefix}.gro",
             "e": f"{prefix}.edr",
             "g": f"{prefix}.log",
             "o": f"{prefix}.trr",
-        })
-        self.report(f"GromacsRunWorkChain setup: step={prefix}")
+        }
+        if self.ctx.write_cpt:
+            mdrun_dict["cpo"] = f"{prefix}.cpt"
+        if self.ctx.write_xtc:
+            mdrun_dict["x"] = f"{prefix}.xtc"
+
+        self.ctx.mdrun_params = MdrunParameters(dict=mdrun_dict)
+        self.report(f"GromacsRunWorkChain setup: step={prefix}, minimization={is_minimization}, xtc={self.ctx.write_xtc}")
 
     def run_grompp(self):
         GromppCalculation = CalculationFactory("gromacs.grompp")
@@ -140,8 +159,11 @@ class GromacsRunWorkChain(WorkChain):
         self.out("trajectory",       self.ctx.mdrun.outputs.trrfile)
         self.out("energy",           self.ctx.mdrun.outputs.enfile)
         self.out("log",              self.ctx.mdrun.outputs.logfile)
+        self.out("tpr_file",         self.ctx.grompp.outputs.tprfile)
 
-        if "cpo_file" in self.ctx.mdrun.outputs:
+        if self.ctx.write_xtc and "x_file" in self.ctx.mdrun.outputs:
+            self.out("trajectory_compressed", self.ctx.mdrun.outputs.x_file)
+        if self.ctx.write_cpt and "cpo_file" in self.ctx.mdrun.outputs:
             self.out("checkpoint", self.ctx.mdrun.outputs.cpo_file)
 
         self.report(f"GromacsRunWorkChain finished: {self.ctx.step_stem}")

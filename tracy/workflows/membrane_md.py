@@ -100,6 +100,11 @@ class RunMembraneMDWorkChain(WorkChain):
             from tracy.workflows.gromacs_run import GromacsRunWorkChain
             engine_wc = GromacsRunWorkChain
 
+        overrides = self.ctx.protocol.get("tracy", {}).get("mdp_overrides", {}).get(step["name"])
+        if overrides:
+            from tracy.adapters.gromacs import patch_mdp
+            mdp_file = patch_mdp(mdp_file, orm.Dict(overrides))
+
         inputs: dict = {
             "structure":     self.ctx.run_inputs["structure"],
             "topology":      self.ctx.run_inputs["topology"],
