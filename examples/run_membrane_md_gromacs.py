@@ -1,17 +1,19 @@
-"""Example: submit RunMembraneMDWorkChain via AiiDA.
+"""Example: submit RunMembraneMDWorkChain with GROMACS via AiiDA.
 
 Loads the bundled GROMACS fixture, constructs a protocol for the
 minimization step, and submits RunMembraneMDWorkChain.
 
 Requirements:
-    - AiiDA daemon running       (verdi daemon start)
-    - gmx registered as a code   (verdi code setup)
-    - aiida-gromacs installed    (pip install -e .[gromacs])
+    - AiiDA daemon running              (verdi daemon start)
+    - GROMACS registered as an AiiDA code (verdi code setup)
+    - aiida-gromacs installed           (pip install -e .[gromacs])
 
-Run with:
-    python examples/run_membrane_md.py
+Edit GROMACS_CODE_LABEL below to match your registered code, then run with:
 
-Then monitor with:
+    python examples/run_membrane_md_gromacs.py
+
+Monitor progress with:
+
     verdi process show <pk>
     verdi process report <pk>
 """
@@ -25,7 +27,7 @@ from aiida.engine import submit
 
 FIXTURE_DIR = Path(__file__).parent.parent / "tests" / "fixtures" / "gromacs_bundle"
 
-# Label of the gmx code registered in AiiDA — adjust to your setup.
+# Edit this to match your registered GROMACS code: `verdi code list`
 GROMACS_CODE_LABEL = "gmx@localhost"
 
 
@@ -37,14 +39,19 @@ def main():
     bundle.store()
 
     protocol = orm.Dict({
-        "codes": {
-            "gromacs": GROMACS_CODE_LABEL,
-        },
         "tracy": {
             "expected_engine": "gromacs",
             "membrane_normal_axis": "z",
             "md_steps": ["minimization"],
         },
+    })
+
+    # Scheduler options — adjust resources and queue to match your cluster.
+    # withmpi=True is applied to mdrun only; grompp always runs serial.
+    options = orm.Dict({
+        "resources": {"num_machines": 1, "num_mpiprocs_per_machine": 1},
+        "max_wallclock_seconds": 3600,
+        "withmpi": True,
     })
 
     from tracy.workflows.membrane_md import RunMembraneMDWorkChain
@@ -54,6 +61,7 @@ def main():
         md_input_bundle=bundle,
         protocol=protocol,
         code=orm.load_code(GROMACS_CODE_LABEL),
+        options=options,
     )
     print(f"Submitted RunMembraneMDWorkChain: pk={wc.pk}")
     print(f"\nMonitor with:  verdi process show {wc.pk}")
