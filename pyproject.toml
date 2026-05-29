@@ -25,13 +25,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+gromacs = ["aiida-gromacs"]
 dev = [
     "pytest>=7.0",
     "pyyaml",
 ]
 
 [project.entry-points."aiida.workflows"]
-"tracy.build_membrane" = "tracy.workflows.membrane_builder:BuildMembraneWorkChain"
+"tracy.build_membrane"    = "tracy.workflows.membrane_builder:BuildMembraneWorkChain"
+"tracy.gromacs_run"       = "tracy.workflows.gromacs_run:GromacsRunWorkChain"
+"tracy.run_membrane_md"   = "tracy.workflows.membrane_md:RunMembraneMDWorkChain"
 
 [tool.hatch.version]
 path = "tracy/__init__.py"
