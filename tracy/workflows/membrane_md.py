@@ -142,9 +142,10 @@ class RunMembraneMDWorkChain(WorkChain):
 
     def _collect_outputs_as_folder(self, wc) -> orm.FolderData:
         """Gather all SinglefileData outputs of a WorkChain into a FolderData."""
+        from aiida.common.links import LinkType
         folder = orm.FolderData()
-        for _, node in wc.outputs.items():
-            if isinstance(node, orm.SinglefileData):
-                with node.open(mode="rb") as fh:
-                    folder.put_object_from_filelike(fh, node.filename, mode="wb")
+        for link in wc.base.links.get_outgoing(link_type=LinkType.RETURN).all():
+            if isinstance(link.node, orm.SinglefileData):
+                with link.node.open(mode="rb") as fh:
+                    folder.put_object_from_filelike(fh, link.node.filename)
         return folder

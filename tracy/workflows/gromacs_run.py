@@ -74,11 +74,10 @@ class GromacsRunWorkChain(WorkChain):
 
         self.ctx.grompp_params = GromppParameters(dict={"o": f"{stem}.tpr"})
         self.ctx.mdrun_params = MdrunParameters(dict={
-            "c":   f"{stem}_out.gro",
-            "e":   f"{stem}.edr",
-            "g":   f"{stem}.log",
-            "o":   f"{stem}.trr",
-            "cpo": f"{stem}.cpt",
+            "c": f"{stem}_out.gro",
+            "e": f"{stem}.edr",
+            "g": f"{stem}.log",
+            "o": f"{stem}.trr",
         })
         self.report(f"GromacsRunWorkChain setup: step={stem}")
 
@@ -90,13 +89,16 @@ class GromacsRunWorkChain(WorkChain):
             "mdpfile":    self.inputs.mdp_file,
             "grofile":    self.inputs.structure,
             "topfile":    self.inputs.topology,
+            "r_file":     self.inputs.structure,
             "parameters": self.ctx.grompp_params,
             "itp_dirs":   {"toppar": self.inputs.toppar},
         }
         if "index_file" in self.inputs:
             inputs["n_file"] = self.inputs.index_file
         if "options" in self.inputs:
-            inputs["metadata"] = {"options": self.inputs.options.get_dict()}
+            # grompp is always serial; strip withmpi regardless of what options says
+            grompp_options = {**self.inputs.options.get_dict(), "withmpi": False}
+            inputs["metadata"] = {"options": grompp_options}
 
         calc = self.submit(GromppCalculation, **inputs)
         self.report(f"Submitted GromppCalculation (pk={calc.pk})")
