@@ -6,20 +6,20 @@ import tempfile
 from pathlib import Path
 
 from aiida import orm
-from aiida.engine import ExitCode, ToContext, WorkChain
+from aiida.engine import ExitCode, ToContext, WorkChain, while_
 
 
 class RunMembraneMDWorkChain(WorkChain):
     """Run GROMACS MD steps from a CHARMM-GUI membrane input bundle.
 
     Dispatches to the appropriate engine adapter based on
-    ``protocol.tracy.expected_engine``.  For Milestone 2 only GROMACS is
-    supported.  Adding a new engine means adding a ``prepare_<engine>_run_inputs``
-    adapter function and one new branch in ``setup`` — this WorkChain does not
-    change.
+    ``protocol.tracy.expected_engine``.  Adding a new engine means adding a
+    ``prepare_<engine>_run_inputs`` adapter function and one new branch in
+    ``setup`` — this WorkChain does not change.
 
-    For Milestone 2 only the minimization step is run.  Future versions extend
-    to the full CHARMM-GUI sequence by iterating over all manifest steps.
+    Steps are driven by ``protocol.tracy.md_steps``, which filters the
+    CHARMM-GUI manifest.  The output structure and checkpoint of each completed
+    step are passed automatically to the next.
 
     Inputs
     ------
@@ -45,7 +45,10 @@ class RunMembraneMDWorkChain(WorkChain):
 
         spec.outline(
             cls.setup,
-            cls.run_md_steps,
+            while_(cls.should_run_next_step)(
+                cls.run_next_step,
+                cls.inspect_step,
+            ),
             cls.results,
         )
 
@@ -88,12 +91,15 @@ class RunMembraneMDWorkChain(WorkChain):
         self.ctx.manifest = manifest
         self.ctx.run_inputs = prepare_fn(self.inputs.md_input_bundle)
         self.ctx.engine = engine
+        self.ctx.current_step_index = 0
+        self.ctx.completed_steps = []
         self.report(f"Setup complete. Engine={engine}, steps={[s['name'] for s in manifest]}")
 
-    def run_md_steps(self):
-        # Milestone 2: run the first (minimization) step only.
-        # TODO: extend to iterate over all manifest steps sequentially.
-        step = self.ctx.manifest[0]
+    def should_run_next_step(self) -> bool:
+        return self.ctx.current_step_index < len(self.ctx.manifest)
+
+    def run_next_step(self):
+        step = self.ctx.manifest[self.ctx.current_step_index]
         mdp_file = self._extract_file_from_bundle(step["mdp"])
 
         if self.ctx.engine == "gromacs":
@@ -115,26 +121,40 @@ class RunMembraneMDWorkChain(WorkChain):
         }
         if "index" in self.ctx.run_inputs:
             inputs["index_file"] = self.ctx.run_inputs["index"]
+        if "checkpoint" in self.ctx.run_inputs:
+            inputs["checkpoint"] = self.ctx.run_inputs["checkpoint"]
         if "options" in self.inputs:
             inputs["options"] = self.inputs.options
 
         calc = self.submit(engine_wc, **inputs)
         self.report(f"Submitted {engine_wc.__name__} for step '{step['name']}' (pk={calc.pk})")
-        return ToContext(md_step=calc)
+        return ToContext(current_step_wc=calc)
 
-    def results(self) -> ExitCode | None:
-        step_wc = self.ctx.md_step
+    def inspect_step(self) -> ExitCode | None:
+        wc = self.ctx.current_step_wc
+        step = self.ctx.manifest[self.ctx.current_step_index]
 
-        if not step_wc.is_finished_ok:
-            self.report(f"MD step failed with exit status {step_wc.exit_status}")
+        if not wc.is_finished_ok:
+            self.report(f"Step '{step['name']}' failed with exit status {wc.exit_status}")
             return self.exit_codes.ERROR_MD_STEP_FAILED
 
-        md_results = self._collect_outputs_as_folder(step_wc)
+        self.ctx.run_inputs["structure"] = wc.outputs.output_structure
+        if "checkpoint" in wc.outputs:
+            self.ctx.run_inputs["checkpoint"] = wc.outputs.checkpoint
+
+        self.ctx.completed_steps.append({"name": step["name"], "pk": wc.pk})
+        self.ctx.current_step_index += 1
+        self.report(f"Step '{step['name']}' finished OK (pk={wc.pk}).")
+
+    def results(self) -> ExitCode | None:
+        last_wc = self.ctx.current_step_wc
+
+        md_results = self._collect_outputs_as_folder(last_wc)
 
         self.out("md_results", md_results.store())
         self.out("md_report", orm.Dict({
-            "steps_run": [s["name"] for s in self.ctx.manifest],
-            "final_step_exit_status": step_wc.exit_status,
+            "steps_run": [s["name"] for s in self.ctx.completed_steps],
+            "final_step_exit_status": last_wc.exit_status,
         }).store())
         self.report("RunMembraneMDWorkChain finished successfully.")
 
