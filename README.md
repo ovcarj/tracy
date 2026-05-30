@@ -9,21 +9,23 @@ AiiDA-based workflow package for building and simulating mitochondrial membrane 
 ```
 CHARMM-GUI membrane construction  →  BuildMembraneWorkChain
 GROMACS molecular dynamics        →  RunMembraneMDWorkChain
-Electrostatic potential           →  (planned)
+Electrostatic potential           →  ComputeMembranePotentialWorkChain
 ```
 
 Each stage is a separate, independently testable WorkChain.
 
 ## Requirements
 
-- Python ≥ 3.10
-- [AiiDA](https://aiida.net) ≥ 2.5
-- [aiida-charmm-gui](https://github.com/ovcarj/aiida-charmm-gui)
+- Python 3.11
+- [AiiDA](https://aiida.net) 2.6.3
+- [aiida-charmm-gui](https://github.com/ovcarj/aiida-charmm-gui) 0.1.0a0
 - A valid CHARMM-GUI account and API token
 
-For GROMACS MD (optional):
-- [aiida-gromacs](https://github.com/CCPBioSim/aiida-gromacs)
-- A GROMACS installation registered as an AiiDA code
+For GROMACS MD and electrostatics (optional):
+- [aiida-gromacs](https://github.com/ovcarj/aiida-gromacs/tree/fix-itp-dirs-upload) 2.2.1, branch `fix-itp-dirs-upload` (fork of CCPBioSim/aiida-gromacs)
+  — contains two fixes not yet merged upstream: MdrunParser index misalignment when
+  `nstxout-compressed > 0`, and sandbox subdirectory creation for `itp_dirs`/`plumed_dirs`
+- GROMACS 2021.7
 
 ## Installation
 
@@ -37,11 +39,18 @@ With GROMACS support:
 pip install -e ".[gromacs]"
 ```
 
+Install the patched aiida-gromacs from the required branch:
+
+```bash
+pip install -e "git+https://github.com/ovcarj/aiida-gromacs.git@fix-itp-dirs-upload#egg=aiida-gromacs"
+```
+
 Register the AiiDA entry points after installation:
 
 ```bash
 verdi plugin list aiida.workflows
-# should show: tracy.build_membrane, tracy.gromacs_run, tracy.run_membrane_md
+# should show: tracy.build_membrane, tracy.gromacs_run, tracy.run_membrane_md,
+#              tracy.compute_membrane_potential
 ```
 
 ---
@@ -156,7 +165,13 @@ index.ndx
 
 ## RunMembraneMDWorkChain
 
-Runs a CHARMM-GUI GROMACS bundle through minimization and/or equilibration using [aiida-gromacs](https://github.com/CCPBioSim/aiida-gromacs). Each step is a separate provenance-tracked `grompp + mdrun` pair.
+Runs a CHARMM-GUI GROMACS bundle through the full MD protocol — minimization, staged
+NPT equilibration, and production — using [aiida-gromacs](https://github.com/CCPBioSim/aiida-gromacs).
+Each step is a separate provenance-tracked `grompp + mdrun` pair.
+
+Step-to-step continuation uses the `.gro` output (which carries velocities). CHARMM-GUI
+equilibration MDPs use `continuation = yes` to read velocities from the input structure
+rather than regenerating them; checkpoints are not forwarded between steps.
 
 **Entry point:** `tracy.run_membrane_md`
 
@@ -174,7 +189,7 @@ Runs a CHARMM-GUI GROMACS bundle through minimization and/or equilibration using
 | Name | Type | Description |
 |---|---|---|
 | `md_results` | `FolderData` | Output files from the last completed step |
-| `md_report` | `Dict` | List of steps run and final exit status |
+| `md_report` | `Dict` | Per-step record (name, prefix, mdp, step_id, pk) and final exit status |
 
 ### Protocol format
 
@@ -190,14 +205,26 @@ tracy:
     - equilibration   # step6.4
     - equilibration   # step6.5
     - equilibration   # step6.6
+    - production
   mdp_overrides:            # optional per-step MDP patches
-    equilibration:
+    production:
       nstxout-compressed: "1000"
 ```
 
-**`md_steps`** is an explicit ordered sequence. Each entry consumes the next matching step from the CHARMM-GUI manifest in order. Repeating `"equilibration"` six times runs all six equilibration stages (`step6.1` through `step6.6`) sequentially. Listing it once runs only the first.
+**`md_steps`** is an explicit ordered sequence. Each entry consumes the next matching step
+from the CHARMM-GUI manifest in order. Repeating `"equilibration"` six times runs all six
+equilibration stages (`step6.1` through `step6.6`) sequentially.
 
-**`mdp_overrides`** patches MDP key-value pairs before submission. Keys are matched case-insensitively with hyphens and underscores treated as equivalent. New keys are appended if not already present. Patching is tracked as an AiiDA `calcfunction` so the modified MDP is part of the provenance graph.
+**`mdp_overrides`** patches MDP key-value pairs before submission, with three levels of
+specificity (most specific wins):
+
+| Key form | Example | Applies to |
+|---|---|---|
+| CHARMM-GUI step ID | `"step6.3"` | that step only |
+| unique prefix | `"equilibration_3"` | that step only |
+| generic name | `"equilibration"` | all equilibration steps |
+
+Patching is tracked as an AiiDA `calcfunction` so the modified MDP is part of the provenance graph.
 
 ### Output file naming
 
@@ -205,10 +232,11 @@ Output files are named after each step with a numeric suffix for repeated steps:
 
 ```
 minimization.gro / .trr / .edr / .log / .tpr
-equilibration_1.gro / .trr / .edr / .log / .tpr / .cpt
+equilibration_1.gro / .xtc / .edr / .log / .tpr / .cpt
 equilibration_2.gro / ...
 ...
 equilibration_6.gro / ...
+production.gro / .xtc / .edr / .log / .tpr / .cpt
 ```
 
 ### Submitting
@@ -229,13 +257,14 @@ protocol = orm.Dict({
         "membrane_normal_axis": "z",
         "md_steps": ["minimization",
                      "equilibration", "equilibration", "equilibration",
-                     "equilibration", "equilibration", "equilibration"],
+                     "equilibration", "equilibration", "equilibration",
+                     "production"],
     },
 })
 
 options = orm.Dict({
     "resources": {"num_machines": 1, "num_mpiprocs_per_machine": 64},
-    "max_wallclock_seconds": 3600,
+    "max_wallclock_seconds": 21600,
     "withmpi": True,
     # "queue_name": "partition",  # SLURM --partition / PBS -q
 })
@@ -257,31 +286,117 @@ Or use the bundled example script:
 python examples/run_membrane_md_gromacs.py
 ```
 
-### Short test runs
-
-Use `mdp_overrides` to reduce step length without modifying the input files:
-
-```python
-"mdp_overrides": {
-    "equilibration": {
-        "nsteps": "500",
-        "nstxout": "500",
-        "nstxout-compressed": "0",
-    },
-},
-```
-
 ---
 
 ## GromacsRunWorkChain
 
-A thin, generic WorkChain wrapping a single `grompp + mdrun` pair. Engine-agnostic and reusable — knows nothing about membranes or CHARMM-GUI. Called by `RunMembraneMDWorkChain` for each step.
+A thin, generic WorkChain wrapping a single `grompp + mdrun` pair. Knows nothing about
+membranes or CHARMM-GUI; called by `RunMembraneMDWorkChain` for each step.
 
 **Entry point:** `tracy.gromacs_run`
 
-**Outputs** include `output_structure`, `trajectory`, `energy`, `log`, `tpr_file` (always), and `trajectory_compressed`, `checkpoint` (conditional on MDP settings).
+**Outputs** include `output_structure`, `energy`, `log`, `tpr_file` (always), and
+`trajectory`, `trajectory_compressed`, `checkpoint` (conditional on MDP settings — the
+integrator and `nstxout-compressed` are read from the MDP file automatically).
 
-The integrator and `nstxout-compressed` values are read from the MDP file to determine whether to request checkpoint and compressed trajectory outputs — no flags needed from the caller.
+`tpr_file` is always exposed so that downstream workchains (e.g.
+`ComputeMembranePotentialWorkChain`) can pass it to analysis tools without re-running grompp.
+
+---
+
+## ComputeMembranePotentialWorkChain
+
+Computes the electrostatic potential profile φ(z) across the membrane from a production
+trajectory. Runs two sequential GROMACS analysis steps:
+
+1. `gmx trjconv` — centres the membrane and fixes periodic boundary conditions
+2. `gmx potential` — integrates Poisson's equation along the membrane normal to produce φ(z)
+
+**Entry point:** `tracy.compute_membrane_potential`
+
+**Inputs**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `tpr_file` | `SinglefileData` | yes | `.tpr` from the production `GromacsRunWorkChain` |
+| `trajectory_compressed` | `SinglefileData` | yes | `.xtc` from the production run |
+| `index_file` | `SinglefileData` | no | `.ndx` index file |
+| `protocol` | `Dict` | yes | Tracy protocol (see below) |
+| `code` | `AbstractCode` | yes | Registered GROMACS code |
+| `options` | `Dict` | no | AiiDA scheduler options |
+
+**Outputs**
+
+| Name | Type | Description |
+|---|---|---|
+| `potential_profile` | `SinglefileData` | `potential.xvg` — position vs. potential |
+| `potential_report` | `Dict` | Axis, slices, groups, symmetrize flag, source tool |
+
+### Protocol format
+
+```yaml
+tracy:
+  membrane_normal_axis: z
+  potential_slices: 100          # number of z-slices for gmx potential
+  trjconv_center_group: "MEMB"   # index group to centre on
+  trjconv_output_group: "SYSTEM" # index group to write out
+  potential_charge_group: "SYSTEM"
+  potential_symmetrize: false    # true for symmetric bilayers (post-processing only)
+  potential_correct: true        # -correct flag: assume net-zero charge
+```
+
+`potential_symmetrize` averages φ(z) with φ(L−z) at plot time. GROMACS 2021 has no
+`-symm` flag; symmetrization is applied in post-processing.
+
+Index group names depend on how the system was built. CHARMM-GUI Quick Bilayer
+typically produces: `MEMB`, `SOLV`, `SYSTEM`.
+
+### Production MDP requirement
+
+The production MDP must have `nstxout-compressed > 0` to write a `.xtc` trajectory.
+Use `mdp_overrides` in the `RunMembraneMDWorkChain` protocol if the default MDP does
+not include this:
+
+```yaml
+mdp_overrides:
+  production:
+    nstxout-compressed: "25000"
+```
+
+### Submitting
+
+```python
+from aiida import load_profile, orm
+from aiida.engine import submit
+
+load_profile()
+
+md_wc = orm.load_node(<RunMembraneMDWorkChain_pk>)
+production_wc = sorted(md_wc.called, key=lambda n: n.pk)[-1]
+
+protocol = orm.Dict({
+    "tracy": {
+        "membrane_normal_axis": "z",
+        "potential_slices": 100,
+        "trjconv_center_group": "MEMB",
+        "trjconv_output_group": "SYSTEM",
+        "potential_charge_group": "SYSTEM",
+        "potential_symmetrize": False,
+        "potential_correct": True,
+    },
+})
+
+from tracy.workflows.electrostatics import ComputeMembranePotentialWorkChain
+wc = submit(
+    ComputeMembranePotentialWorkChain,
+    tpr_file=production_wc.outputs.tpr_file,
+    trajectory_compressed=production_wc.outputs.trajectory_compressed,
+    index_file=production_wc.inputs.index_file,
+    protocol=protocol,
+    code=orm.load_code("gmx@cluster"),
+)
+print(f"pk={wc.pk}")
+```
 
 ---
 
