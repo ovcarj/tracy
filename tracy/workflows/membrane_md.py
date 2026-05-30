@@ -152,7 +152,12 @@ class RunMembraneMDWorkChain(WorkChain):
             from tracy.workflows.gromacs_run import GromacsRunWorkChain
             engine_wc = GromacsRunWorkChain
 
-        overrides = self.ctx.protocol.get("tracy", {}).get("mdp_overrides", {}).get(step["name"])
+        mdp_overrides = self.ctx.protocol.get("tracy", {}).get("mdp_overrides", {})
+        overrides = (
+            mdp_overrides.get(step["step_id"])    # most specific: "step6.3"
+            or mdp_overrides.get(step["prefix"])  # unique prefix:  "equilibration_3"
+            or mdp_overrides.get(step["name"])    # generic name:   "equilibration"
+        )
         if overrides:
             from tracy.adapters.gromacs import patch_mdp
             mdp_file = patch_mdp(mdp_file, orm.Dict(overrides))
@@ -186,7 +191,13 @@ class RunMembraneMDWorkChain(WorkChain):
 
         self.ctx.run_inputs["structure"] = wc.outputs.output_structure
 
-        self.ctx.completed_steps.append({"name": step["name"], "pk": wc.pk})
+        self.ctx.completed_steps.append({
+            "name":    step["name"],
+            "prefix":  step["prefix"],
+            "mdp":     step["mdp"],
+            "step_id": step["step_id"],
+            "pk":      wc.pk,
+        })
         self.ctx.current_step_index += 1
         self.report(f"Step '{step['name']}' finished OK (pk={wc.pk}).")
 
@@ -197,7 +208,7 @@ class RunMembraneMDWorkChain(WorkChain):
 
         self.out("md_results", md_results.store())
         self.out("md_report", orm.Dict({
-            "steps_run": [s["name"] for s in self.ctx.completed_steps],
+            "steps_run": self.ctx.completed_steps,
             "final_step_exit_status": last_wc.exit_status,
         }).store())
         self.report("RunMembraneMDWorkChain finished successfully.")
