@@ -62,7 +62,7 @@ class GromacsRunWorkChain(WorkChain):
         )
 
         spec.output("output_structure",      valid_type=orm.SinglefileData)
-        spec.output("trajectory",            valid_type=orm.SinglefileData)
+        spec.output("trajectory",            valid_type=orm.SinglefileData, required=False)
         spec.output("energy",                valid_type=orm.SinglefileData)
         spec.output("log",                   valid_type=orm.SinglefileData)
         spec.output("tpr_file",              valid_type=orm.SinglefileData)
@@ -156,7 +156,8 @@ class GromacsRunWorkChain(WorkChain):
             return self.exit_codes.ERROR_MDRUN_FAILED
 
         self.out("output_structure", self.ctx.mdrun.outputs.grofile)
-        self.out("trajectory",       self.ctx.mdrun.outputs.trrfile)
+        if "trrfile" in self.ctx.mdrun.outputs:
+            self.out("trajectory", self.ctx.mdrun.outputs.trrfile)
         self.out("energy",           self.ctx.mdrun.outputs.enfile)
         self.out("log",              self.ctx.mdrun.outputs.logfile)
         self.out("tpr_file",         self.ctx.grompp.outputs.tprfile)

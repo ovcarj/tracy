@@ -48,14 +48,17 @@ def main():
     if hasattr(wc.inputs, "index_file"):
         index_file = wc.inputs.index_file
 
+    # Group names must match the index groups in your .ndx file.
+    # Check available groups with: gmx make_ndx -f structure.gro -o /dev/null
+    # CHARMM-GUI Quick Bilayer typically produces: MEMB, SOLV, SYSTEM
     protocol = orm.Dict({
         "tracy": {
             "membrane_normal_axis": "z",
             "potential_slices": 100,
-            "trjconv_center_group": "Membrane",
-            "trjconv_output_group": "System",
-            "potential_charge_group": "System",
-            "potential_symmetrize": False,   # asymmetric bilayer — do not symmetrize
+            "trjconv_center_group": "MEMB",    # centre on the membrane
+            "trjconv_output_group": "SYSTEM",  # write all atoms
+            "potential_charge_group": "SYSTEM",
+            "potential_symmetrize": False,      # asymmetric bilayer — do not symmetrize
             "potential_correct": True,
         },
     })
