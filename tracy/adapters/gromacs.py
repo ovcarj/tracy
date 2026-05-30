@@ -119,7 +119,7 @@ def prepare_gromacs_run_inputs(bundle: orm.FolderData) -> dict:
         toppar.put_object_from_tree(str(toppar_dir))
         result["toppar"] = toppar
 
-        ndx_files = list(root.glob("*.ndx"))
+        ndx_files = sorted(p for p in root.glob("*.ndx") if p.is_file())
         if len(ndx_files) > 1:
             raise ValueError(f"Multiple .ndx files found in bundle: {[f.name for f in ndx_files]}")
         if ndx_files:
@@ -130,7 +130,7 @@ def prepare_gromacs_run_inputs(bundle: orm.FolderData) -> dict:
 
 def _find_unique(root: Path, pattern: str, description: str) -> Path:
     """Return the single file in *root* matching *pattern*, or raise ValueError."""
-    matches = list(root.glob(pattern))
+    matches = sorted(p for p in root.glob(pattern) if p.is_file())
     if not matches:
         raise ValueError(f"No {description} ({pattern}) found in bundle.")
     if len(matches) > 1:
