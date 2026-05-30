@@ -36,7 +36,8 @@ class PotentialCalculation(CalcJob):
         spec.input("axis",         valid_type=Str,  default=lambda: Str("Z"),
                    help="Membrane normal axis (X, Y, or Z)")
         spec.input("symmetrize",   valid_type=Bool, default=lambda: Bool(False),
-                   help="Apply -symm flag (only for symmetric bilayers)")
+                   help="Record symmetry intent in potential_report for post-processing. "
+                        "gmx potential 2021 has no -symm flag; averaging is done at plot time.")
         spec.input("correct",      valid_type=Bool, default=lambda: Bool(True),
                    help="Apply -correct flag (charge correction, recommended)")
 
@@ -69,8 +70,6 @@ class PotentialCalculation(CalcJob):
         ]
         if "index_file" in self.inputs:
             cmdline += ["-n", self.inputs.index_file.filename]
-        if self.inputs.symmetrize.value:
-            cmdline.append("-symm")
         if self.inputs.correct.value:
             cmdline.append("-correct")
 

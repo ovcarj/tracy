@@ -31,7 +31,7 @@ class ComputeMembranePotentialWorkChain(WorkChain):
       trjconv_center_group     : index group to centre on (default: "Membrane")
       trjconv_output_group     : index group to write (default: "System")
       potential_charge_group   : index group for potential analysis (default: "System")
-      potential_symmetrize     : apply -symm (default: false; asymmetric bilayers)
+      potential_symmetrize     : record symmetry intent for post-processing (no GROMACS flag; gmx 2021 lacks -symm)
       potential_correct        : apply -correct charge correction (default: true)
 
     Outputs
