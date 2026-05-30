@@ -1,4 +1,4 @@
-"""Spec tests for TrjconvCalculation and PotentialCalculation."""
+"""Spec tests for TrjconvCalculation, PotentialCalculation, SelectGroupsCalculation."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from aiida.engine import CalcJob
 
 from tracy.calculations.trjconv import TrjconvCalculation
 from tracy.calculations.potential import PotentialCalculation
+from tracy.calculations.select_groups import SelectGroupsCalculation
 
 
 # ---------------------------------------------------------------------------
@@ -94,4 +95,46 @@ def test_potential_parser_name_default():
 
 def test_potential_withmpi_default_false():
     spec = PotentialCalculation.spec()
+    assert spec.inputs["metadata"]["options"]["withmpi"].default is False
+
+
+# ---------------------------------------------------------------------------
+# SelectGroupsCalculation
+# ---------------------------------------------------------------------------
+
+
+def test_select_groups_is_calcjob():
+    assert issubclass(SelectGroupsCalculation, CalcJob)
+
+
+def test_select_groups_required_inputs():
+    spec = SelectGroupsCalculation.spec()
+    assert spec.inputs["tpr_file"].required is True
+    assert spec.inputs["selections"].required is True
+
+
+def test_select_groups_optional_inputs():
+    spec = SelectGroupsCalculation.spec()
+    assert spec.inputs["index_file"].required is False
+
+
+def test_select_groups_has_index_output():
+    spec = SelectGroupsCalculation.spec()
+    assert "index_file" in spec.outputs
+    assert issubclass(spec.outputs["index_file"].valid_type, orm.SinglefileData)
+
+
+def test_select_groups_exit_code():
+    codes = SelectGroupsCalculation.spec().exit_codes
+    assert hasattr(codes, "ERROR_MISSING_OUTPUT_FILES")
+    assert codes.ERROR_MISSING_OUTPUT_FILES.status == 300
+
+
+def test_select_groups_parser_name_default():
+    spec = SelectGroupsCalculation.spec()
+    assert spec.inputs["metadata"]["options"]["parser_name"].default == "tracy.select_groups"
+
+
+def test_select_groups_withmpi_default_false():
+    spec = SelectGroupsCalculation.spec()
     assert spec.inputs["metadata"]["options"]["withmpi"].default is False

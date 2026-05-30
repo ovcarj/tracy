@@ -32,18 +32,21 @@ dev = [
 ]
 
 [project.entry-points."aiida.calculations"]
-"tracy.trjconv"  = "tracy.calculations.trjconv:TrjconvCalculation"
-"tracy.potential" = "tracy.calculations.potential:PotentialCalculation"
+"tracy.trjconv"       = "tracy.calculations.trjconv:TrjconvCalculation"
+"tracy.potential"     = "tracy.calculations.potential:PotentialCalculation"
+"tracy.select_groups" = "tracy.calculations.select_groups:SelectGroupsCalculation"
 
 [project.entry-points."aiida.parsers"]
-"tracy.trjconv"  = "tracy.calculations.trjconv:TrjconvParser"
-"tracy.potential" = "tracy.calculations.potential:PotentialParser"
+"tracy.trjconv"       = "tracy.calculations.trjconv:TrjconvParser"
+"tracy.potential"     = "tracy.calculations.potential:PotentialParser"
+"tracy.select_groups" = "tracy.calculations.select_groups:SelectGroupsParser"
 
 [project.entry-points."aiida.workflows"]
 "tracy.build_membrane"             = "tracy.workflows.membrane_builder:BuildMembraneWorkChain"
 "tracy.gromacs_run"                = "tracy.workflows.gromacs_run:GromacsRunWorkChain"
 "tracy.run_membrane_md"            = "tracy.workflows.membrane_md:RunMembraneMDWorkChain"
 "tracy.compute_membrane_potential" = "tracy.workflows.electrostatics:ComputeMembranePotentialWorkChain"
+"tracy.create_index_groups"        = "tracy.workflows.create_index_groups:CreateIndexGroupsWorkChain"
 
 [tool.hatch.version]
 path = "tracy/__init__.py"
