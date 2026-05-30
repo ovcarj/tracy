@@ -125,6 +125,9 @@ class RunMembraneMDWorkChain(WorkChain):
             return self.exit_codes.ERROR_MANIFEST_INVALID
 
         requested = tracy_conf.get("md_steps", ["minimization"])
+        if not requested:
+            self.report("md_steps is empty — nothing to run.")
+            return self.exit_codes.ERROR_MANIFEST_INVALID
         try:
             manifest = _select_steps(manifest, requested)
         except ValueError as exc:

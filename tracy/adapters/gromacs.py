@@ -92,30 +92,53 @@ def prepare_gromacs_run_inputs(bundle: orm.FolderData) -> dict:
 
     Returns a dict with keys:
         structure  — SinglefileData (.gro)
-        topology   — SinglefileData (topol.top)
+        topology   — SinglefileData (.top)
         toppar     — FolderData    (toppar/ directory)
         index      — SinglefileData (.ndx), only if present
 
-    These map directly to GromacsRunWorkChain inputs.
+    Files are discovered by extension rather than hardcoded names, except for
+    the toppar/ directory whose name is load-bearing (referenced by topol.top
+    #include paths and must match the remote directory created by grompp).
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         bundle.base.repository.copy_tree(tmpdir)
         root = Path(tmpdir)
 
         result: dict = {
-            "structure": orm.SinglefileData(file=str(root / "step5_input.gro")),
-            "topology": orm.SinglefileData(file=str(root / "topol.top")),
+            "structure": orm.SinglefileData(file=str(_find_unique(root, "*.gro", "input structure"))),
+            "topology":  orm.SinglefileData(file=str(_find_unique(root, "*.top", "topology file"))),
         }
 
+        toppar_dir = root / "toppar"
+        if not toppar_dir.is_dir():
+            raise ValueError(
+                "No 'toppar/' directory found in bundle. "
+                "The directory name is required to match the #include paths in topol.top."
+            )
         toppar = orm.FolderData()
-        toppar.put_object_from_tree(str(root / "toppar"))
+        toppar.put_object_from_tree(str(toppar_dir))
         result["toppar"] = toppar
 
-        ndx = root / "index.ndx"
-        if ndx.exists():
-            result["index"] = orm.SinglefileData(file=str(ndx))
+        ndx_files = list(root.glob("*.ndx"))
+        if len(ndx_files) > 1:
+            raise ValueError(f"Multiple .ndx files found in bundle: {[f.name for f in ndx_files]}")
+        if ndx_files:
+            result["index"] = orm.SinglefileData(file=str(ndx_files[0]))
 
         return result
+
+
+def _find_unique(root: Path, pattern: str, description: str) -> Path:
+    """Return the single file in *root* matching *pattern*, or raise ValueError."""
+    matches = list(root.glob(pattern))
+    if not matches:
+        raise ValueError(f"No {description} ({pattern}) found in bundle.")
+    if len(matches) > 1:
+        raise ValueError(
+            f"Multiple {description} files found in bundle: {[f.name for f in matches]}. "
+            "Expected exactly one."
+        )
+    return matches[0]
 
 
 # ---------------------------------------------------------------------------
