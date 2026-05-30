@@ -50,7 +50,9 @@ Register the AiiDA entry points after installation:
 ```bash
 verdi plugin list aiida.workflows
 # should show: tracy.build_membrane, tracy.gromacs_run, tracy.run_membrane_md,
-#              tracy.compute_membrane_potential
+#              tracy.compute_membrane_potential, tracy.create_index_groups
+verdi plugin list aiida.calculations
+# should show: tracy.trjconv, tracy.potential, tracy.select_groups
 ```
 
 ---
@@ -307,10 +309,13 @@ integrator and `nstxout-compressed` are read from the MDP file automatically).
 ## ComputeMembranePotentialWorkChain
 
 Computes the electrostatic potential profile φ(z) across the membrane from a production
-trajectory. Runs two sequential GROMACS analysis steps:
+trajectory. Engine-agnostic: dispatches to GROMACS tools via adapter functions; other
+engines can be added by implementing new adapters.
 
-1. `gmx trjconv` — centres the membrane and fixes periodic boundary conditions
-2. `gmx potential` — integrates Poisson's equation along the membrane normal to produce φ(z)
+Pipeline:
+1. Trajectory preprocessing (`gmx trjconv`) — centres membrane, fixes PBC
+2. Optional: create new index groups (`gmx select`) via `CreateIndexGroupsWorkChain`
+3. `gmx potential` — one run per group, all in parallel; total + per-component profiles
 
 **Entry point:** `tracy.compute_membrane_potential`
 
@@ -329,27 +334,47 @@ trajectory. Runs two sequential GROMACS analysis steps:
 
 | Name | Type | Description |
 |---|---|---|
-| `potential_profile` | `SinglefileData` | `potential.xvg` — position vs. potential |
-| `potential_report` | `Dict` | Axis, slices, groups, symmetrize flag, source tool |
+| `potential_profile` | `SinglefileData` | `potential.xvg` for total group |
+| `potential_report` | `Dict` | Axis, slices, groups, component list, symmetrize flag |
+| `potential_components.<group>` | `SinglefileData` | Per-component `.xvg` (one per entry in `potential_component_groups`) |
 
 ### Protocol format
 
 ```yaml
 tracy:
+  expected_engine: gromacs
   membrane_normal_axis: z
-  potential_slices: 100          # number of z-slices for gmx potential
-  trjconv_center_group: "MEMB"   # index group to centre on
-  trjconv_output_group: "SYSTEM" # index group to write out
-  potential_charge_group: "SYSTEM"
-  potential_symmetrize: false    # true for symmetric bilayers (post-processing only)
-  potential_correct: true        # -correct flag: assume net-zero charge
+  potential_slices: 100            # number of z-slices for gmx potential
+  trjconv_center_group: "MEMB"     # index group to centre on
+  trjconv_output_group: "SYSTEM"   # index group to write out
+  potential_charge_group: "SYSTEM" # group for total potential
+  potential_component_groups:      # optional: per-group decomposition (run in parallel)
+    - "MEMB"
+    - "Water"
+    - "ION"
+  new_index_groups:                # optional: create additional groups before analysis
+    - '"Water" resname TIP3'       # gmx-select syntax; CHARMM36 water residue name
+    - '"ION" resname POT CLA'      # CHARMM36 K+ and Cl- residue names
+  potential_symmetrize: false      # true for symmetric bilayers (post-processing only)
+  potential_correct: true          # -correct flag: assume net-zero charge
 ```
+
+**Per-group decomposition**: by linearity of Poisson's equation,
+φ(MEMB) + φ(Water) + φ(ION) = φ(SYSTEM). Each component is run as a separate
+`gmx potential` job in parallel and stored as `potential_components.<group>`.
+
+**`new_index_groups`**: CHARMM-GUI Quick Bilayer produces only `MEMB`, `SOLV`, `SYSTEM`.
+To decompose `SOLV` into `Water` and `ION`, supply `new_index_groups` with
+`gmx select` selection strings. Residue names are force-field dependent:
+
+| Force field | Water | K⁺ | Cl⁻ |
+|---|---|---|---|
+| CHARMM36 (CHARMM-GUI) | `TIP3` | `POT` | `CLA` |
+| AMBER | `WAT` / `HOH` | `Na+` | `Cl-` |
+| GROMOS | `SOL` | `NA` | `CL` |
 
 `potential_symmetrize` averages φ(z) with φ(L−z) at plot time. GROMACS 2021 has no
 `-symm` flag; symmetrization is applied in post-processing.
-
-Index group names depend on how the system was built. CHARMM-GUI Quick Bilayer
-typically produces: `MEMB`, `SOLV`, `SYSTEM`.
 
 ### Production MDP requirement
 
@@ -376,11 +401,14 @@ production_wc = sorted(md_wc.called, key=lambda n: n.pk)[-1]
 
 protocol = orm.Dict({
     "tracy": {
+        "expected_engine": "gromacs",
         "membrane_normal_axis": "z",
-        "potential_slices": 100,
+        "potential_slices": 200,
         "trjconv_center_group": "MEMB",
         "trjconv_output_group": "SYSTEM",
         "potential_charge_group": "SYSTEM",
+        "new_index_groups": ['"Water" resname TIP3', '"ION" resname POT CLA'],
+        "potential_component_groups": ["MEMB", "Water", "ION"],
         "potential_symmetrize": False,
         "potential_correct": True,
     },
@@ -397,6 +425,45 @@ wc = submit(
 )
 print(f"pk={wc.pk}")
 ```
+
+Or use the bundled example script:
+
+```bash
+python examples/compute_membrane_potential_gromacs.py
+```
+
+---
+
+## CreateIndexGroupsWorkChain
+
+Creates new named atom groups from selection strings and appends them to an existing
+index file. Useful for splitting CHARMM-GUI's `SOLV` group into separate `Water` and
+`ION` groups before electrostatic analysis.
+
+**Entry point:** `tracy.create_index_groups`
+
+**Inputs**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `tpr_file` | `SinglefileData` | yes | Topology reference for atom information |
+| `index_file` | `SinglefileData` | no | Existing `.ndx` to append to |
+| `selections` | `List` | yes | `gmx select` selection strings |
+| `protocol` | `Dict` | yes | Tracy protocol (`expected_engine` key) |
+| `code` | `AbstractCode` | yes | Registered GROMACS code |
+| `options` | `Dict` | no | AiiDA scheduler options |
+
+**Output**: `index_file` (`SinglefileData`) — original groups + newly created groups.
+
+The original groups are never modified:
+```
+Before:  [ MEMB ]  [ SOLV ]  [ SYSTEM ]
+After:   [ MEMB ]  [ SOLV ]  [ SYSTEM ]  [ Water ]  [ ION ]
+```
+
+Internally runs `SelectGroupsCalculation` (`gmx select`) to create the new groups,
+then merges with the original index via `merge_index_files` (plain-text concatenation,
+tracked as an AiiDA `calcfunction`).
 
 ---
 
