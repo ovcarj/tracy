@@ -5,7 +5,27 @@ from __future__ import annotations
 from aiida import orm
 from aiida.engine import WorkChain
 
-from tracy.workflows.electrostatics import ComputeMembranePotentialWorkChain
+from tracy.workflows.electrostatics import ComputeMembranePotentialWorkChain, _group_to_label
+
+
+def test_group_to_label_safe_names():
+    assert _group_to_label("MEMB") == "MEMB"
+    assert _group_to_label("Water") == "Water"
+    assert _group_to_label("ION") == "ION"
+
+
+def test_group_to_label_sanitizes_special_chars():
+    assert _group_to_label("Na+") == "Na_"
+    assert _group_to_label("Water and ions") == "Water_and_ions"
+    assert _group_to_label("POPC(head)") == "POPC_head_"
+
+
+def test_group_to_label_leading_digit():
+    assert _group_to_label("1group") == "_1group"
+
+
+def test_group_to_label_empty():
+    assert _group_to_label("") == "_group"
 
 
 def test_is_workchain_subclass():

@@ -2,8 +2,18 @@
 
 from __future__ import annotations
 
+import re
+
 from aiida import orm
 from aiida.engine import ExitCode, ToContext, WorkChain, append_, if_
+
+
+def _group_to_label(group: str) -> str:
+    """Sanitize a GROMACS group name to a valid AiiDA output port label."""
+    label = re.sub(r"[^A-Za-z0-9_]", "_", group)
+    if label and label[0].isdigit():
+        label = "_" + label
+    return label or "_group"
 
 
 class ComputeMembranePotentialWorkChain(WorkChain):
@@ -205,8 +215,9 @@ class ComputeMembranePotentialWorkChain(WorkChain):
 
         self.out("potential_profile", calcs[0].outputs.potential_xvg)
 
+        component_labels = {g: _group_to_label(g) for g in self.ctx.component_groups}
         for group, calc in zip(self.ctx.component_groups, calcs[1:]):
-            self.out(f"potential_components.{group}", calc.outputs.potential_xvg)
+            self.out(f"potential_components.{component_labels[group]}", calc.outputs.potential_xvg)
 
         self.out("potential_report", orm.Dict({
             "axis":             self.ctx.axis,
@@ -215,6 +226,7 @@ class ComputeMembranePotentialWorkChain(WorkChain):
             "output_group":     self.ctx.output_group,
             "charge_group":     self.ctx.charge_group,
             "component_groups": list(self.ctx.component_groups),
+            "component_labels": component_labels,
             "symmetrize":       self.ctx.symmetrize,
             "correct":          self.ctx.correct,
             "source_tool":      "gmx potential",
