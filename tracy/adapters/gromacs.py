@@ -194,6 +194,67 @@ def _apply_mdp_overrides(content: str, overrides: dict) -> str:
     return "\n".join(patched)
 
 
+# ---------------------------------------------------------------------------
+# Electrostatic potential adapter functions
+# ---------------------------------------------------------------------------
+
+def submit_potential_preprocessing(wc, *, trajectory, tpr_file, center_group,
+                                   output_group, index_file, options):
+    """Submit TrjconvCalculation for trajectory centring and PBC fixing."""
+    from tracy.calculations.trjconv import TrjconvCalculation
+
+    inputs = {
+        "code":         wc.inputs.code,
+        "trajectory":   trajectory,
+        "tpr_file":     tpr_file,
+        "center_group": orm.Str(center_group),
+        "output_group": orm.Str(output_group),
+        "metadata":     {"options": options},
+    }
+    if index_file is not None:
+        inputs["index_file"] = index_file
+    return wc.submit(TrjconvCalculation, **inputs)
+
+
+def submit_potential_calculation(wc, *, trajectory, tpr_file, charge_group,
+                                 n_slices, axis, symmetrize, correct,
+                                 index_file, options):
+    """Submit PotentialCalculation for a single charge group."""
+    from tracy.calculations.potential import PotentialCalculation
+
+    inputs = {
+        "code":         wc.inputs.code,
+        "trajectory":   trajectory,
+        "tpr_file":     tpr_file,
+        "charge_group": orm.Str(charge_group),
+        "n_slices":     orm.Int(n_slices),
+        "axis":         orm.Str(axis),
+        "symmetrize":   orm.Bool(symmetrize),
+        "correct":      orm.Bool(correct),
+        "metadata":     {"options": options},
+    }
+    if index_file is not None:
+        inputs["index_file"] = index_file
+    return wc.submit(PotentialCalculation, **inputs)
+
+
+def submit_select_groups(wc, *, tpr_file, index_file, selections, options):
+    """Submit SelectGroupsCalculation to create new named atom groups."""
+    from tracy.calculations.select_groups import SelectGroupsCalculation
+
+    inputs = {
+        "code":       wc.inputs.code,
+        "tpr_file":   tpr_file,
+        "selections": selections,
+        "metadata":   {"options": options},
+    }
+    if index_file is not None:
+        inputs["index_file"] = index_file
+    return wc.submit(SelectGroupsCalculation, **inputs)
+
+
+# ---------------------------------------------------------------------------
+
 @calcfunction
 def patch_mdp(mdp_file: orm.SinglefileData, overrides: orm.Dict) -> orm.SinglefileData:
     """Apply key-value overrides to a GROMACS MDP file, preserving provenance.

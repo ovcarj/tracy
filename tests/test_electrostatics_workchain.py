@@ -65,6 +65,14 @@ def test_has_potential_report_output():
     assert issubclass(port.valid_type, orm.Dict)
 
 
+def test_has_potential_components_namespace():
+    spec = ComputeMembranePotentialWorkChain.spec()
+    assert "potential_components" in spec.outputs
+    ns = spec.outputs["potential_components"]
+    assert ns.required is False
+    assert ns.dynamic is True
+
+
 # ---------------------------------------------------------------------------
 # Exit codes
 # ---------------------------------------------------------------------------
@@ -80,3 +88,15 @@ def test_exit_code_potential_failed():
     codes = ComputeMembranePotentialWorkChain.spec().exit_codes
     assert hasattr(codes, "ERROR_POTENTIAL_FAILED")
     assert codes.ERROR_POTENTIAL_FAILED.status == 501
+
+
+def test_exit_code_unsupported_engine():
+    codes = ComputeMembranePotentialWorkChain.spec().exit_codes
+    assert hasattr(codes, "ERROR_UNSUPPORTED_ENGINE")
+    assert codes.ERROR_UNSUPPORTED_ENGINE.status == 502
+
+
+def test_exit_code_create_index_groups_failed():
+    codes = ComputeMembranePotentialWorkChain.spec().exit_codes
+    assert hasattr(codes, "ERROR_CREATE_INDEX_GROUPS_FAILED")
+    assert codes.ERROR_CREATE_INDEX_GROUPS_FAILED.status == 503

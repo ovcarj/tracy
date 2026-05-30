@@ -50,7 +50,7 @@ def main():
 
     # Group names must match the index groups in your .ndx file.
     # Check available groups with: gmx make_ndx -f structure.gro -o /dev/null
-    # CHARMM-GUI Quick Bilayer typically produces: MEMB, SOLV, SYSTEM
+    # CHARMM-GUI Quick Bilayer typically produces: MEMB, Water, ION, SYSTEM
     protocol = orm.Dict({
         "tracy": {
             "membrane_normal_axis": "z",
@@ -58,6 +58,9 @@ def main():
             "trjconv_center_group": "MEMB",    # centre on the membrane
             "trjconv_output_group": "SYSTEM",  # write all atoms
             "potential_charge_group": "SYSTEM",
+            # Decompose into per-group contributions (omit to compute total only).
+            # By Poisson linearity: φ_MEMB + φ_Water + φ_ION = φ_SYSTEM
+            "potential_component_groups": ["MEMB", "Water", "ION"],
             "potential_symmetrize": False,      # asymmetric bilayer — do not symmetrize
             "potential_correct": True,
         },
