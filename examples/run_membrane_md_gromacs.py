@@ -1,7 +1,7 @@
 """Example: submit RunMembraneMDWorkChain with GROMACS via AiiDA.
 
-Loads the bundled GROMACS fixture, constructs a protocol for the
-minimization step, and submits RunMembraneMDWorkChain.
+Loads the bundled GROMACS fixture, constructs a protocol for
+minimization followed by all six equilibration steps.
 
 Requirements:
     - AiiDA daemon running              (verdi daemon start)
@@ -42,7 +42,18 @@ def main():
         "tracy": {
             "expected_engine": "gromacs",
             "membrane_normal_axis": "z",
-            "md_steps": ["minimization"],
+            "md_steps": ["minimization",
+                         "equilibration", "equilibration", "equilibration",
+                         "equilibration", "equilibration", "equilibration"],
+            # mdp_overrides patches MDP keys per step before submission.
+            # Useful for short test runs — remove for production:
+            # "mdp_overrides": {
+            #     "equilibration": {
+            #         "nsteps": "500",
+            #         "nstxout": "500",
+            #         "nstxout-compressed": "0",
+            #     },
+            # },
         },
     })
 
@@ -52,6 +63,7 @@ def main():
         "resources": {"num_machines": 1, "num_mpiprocs_per_machine": 1},
         "max_wallclock_seconds": 3600,
         "withmpi": True,
+        # "queue_name": "partition",  # uncomment and set for SLURM --partition / PBS -q
     })
 
     from tracy.workflows.membrane_md import RunMembraneMDWorkChain

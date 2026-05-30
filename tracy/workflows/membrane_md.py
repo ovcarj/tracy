@@ -9,6 +9,49 @@ from aiida import orm
 from aiida.engine import ExitCode, ToContext, WorkChain, while_
 
 
+def _select_steps(manifest: list[dict], requested: list[str]) -> list[dict]:
+    """Return an ordered subset of manifest entries matching the requested sequence.
+
+    Each entry in *requested* consumes the next manifest step with that name.
+    Repeating a name selects successive steps: ["equilibration", "equilibration"]
+    picks step6.1 then step6.2.  Raises ValueError if a requested name has no
+    remaining match in the manifest.
+    """
+    result = []
+    search_from = 0
+    for name in requested:
+        for i in range(search_from, len(manifest)):
+            if manifest[i]["name"] == name:
+                result.append(manifest[i])
+                search_from = i + 1
+                break
+        else:
+            raise ValueError(
+                f"No manifest step named '{name}' found after position {search_from}."
+            )
+    return result
+
+
+def _assign_output_prefixes(manifest: list[dict]) -> list[dict]:
+    """Add a unique 'prefix' key to each manifest step.
+
+    Steps whose name is unique in the manifest keep the name as-is.
+    Repeated names (e.g. six equilibration steps) get _1, _2, ... suffixes.
+    """
+    from collections import Counter
+    name_counts = Counter(s["name"] for s in manifest)
+    name_seen: Counter = Counter()
+    result = []
+    for step in manifest:
+        name_seen[step["name"]] += 1
+        if name_counts[step["name"]] > 1:
+            prefix = f"{step['name']}_{name_seen[step['name']]}"
+        else:
+            prefix = step["name"]
+        result.append({**step, "prefix": prefix})
+    return result
+
+
 class RunMembraneMDWorkChain(WorkChain):
     """Run GROMACS MD steps from a CHARMM-GUI membrane input bundle.
 
@@ -82,18 +125,18 @@ class RunMembraneMDWorkChain(WorkChain):
             return self.exit_codes.ERROR_MANIFEST_INVALID
 
         requested = tracy_conf.get("md_steps", ["minimization"])
-        manifest = [s for s in manifest if s["name"] in requested]
-
-        if not manifest:
-            self.report(f"No steps in bundle matched md_steps={requested}")
+        try:
+            manifest = _select_steps(manifest, requested)
+        except ValueError as exc:
+            self.report(f"Invalid md_steps: {exc}")
             return self.exit_codes.ERROR_MANIFEST_INVALID
 
-        self.ctx.manifest = manifest
+        self.ctx.manifest = _assign_output_prefixes(manifest)
         self.ctx.run_inputs = prepare_fn(self.inputs.md_input_bundle)
         self.ctx.engine = engine
         self.ctx.current_step_index = 0
         self.ctx.completed_steps = []
-        self.report(f"Setup complete. Engine={engine}, steps={[s['name'] for s in manifest]}")
+        self.report(f"Setup complete. Engine={engine}, steps={[s['prefix'] for s in self.ctx.manifest]}")
 
     def should_run_next_step(self) -> bool:
         return self.ctx.current_step_index < len(self.ctx.manifest)
@@ -117,7 +160,7 @@ class RunMembraneMDWorkChain(WorkChain):
             "toppar":        self.ctx.run_inputs["toppar"],
             "mdp_file":      mdp_file,
             "gromacs_code":  self.inputs.code,
-            "output_prefix": orm.Str(step["name"]),
+            "output_prefix": orm.Str(step["prefix"]),
         }
         if "index" in self.ctx.run_inputs:
             inputs["index_file"] = self.ctx.run_inputs["index"]
@@ -139,8 +182,6 @@ class RunMembraneMDWorkChain(WorkChain):
             return self.exit_codes.ERROR_MD_STEP_FAILED
 
         self.ctx.run_inputs["structure"] = wc.outputs.output_structure
-        if "checkpoint" in wc.outputs:
-            self.ctx.run_inputs["checkpoint"] = wc.outputs.checkpoint
 
         self.ctx.completed_steps.append({"name": step["name"], "pk": wc.pk})
         self.ctx.current_step_index += 1
