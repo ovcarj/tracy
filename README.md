@@ -16,7 +16,7 @@ Each stage is a separate, independently testable WorkChain.
 
 ## Requirements
 
-- Python 3.11
+- Python ≥3.10
 - [AiiDA](https://aiida.net) 2.6.3
 - [aiida-charmm-gui](https://github.com/ovcarj/aiida-charmm-gui) 0.1.0a0
 - A valid CHARMM-GUI account and API token
