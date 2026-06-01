@@ -171,9 +171,17 @@ Runs a CHARMM-GUI GROMACS bundle through the full MD protocol — minimization, 
 NPT equilibration, and production — using [aiida-gromacs](https://github.com/CCPBioSim/aiida-gromacs).
 Each step is a separate provenance-tracked `grompp + mdrun` pair.
 
-Step-to-step continuation uses the `.gro` output (which carries velocities). CHARMM-GUI
-equilibration MDPs use `continuation = yes` to read velocities from the input structure
-rather than regenerating them; checkpoints are not forwarded between steps.
+Step-to-step continuation uses the `.gro` output (which carries coordinates and
+velocities). CHARMM-GUI equilibration MDPs set `continuation = yes` to read velocities
+from the input structure rather than regenerating them. Checkpoints (`.cpt`) are **not**
+forwarded between steps: GROMACS embeds the source filename and ensemble parameters in
+each checkpoint, so passing a checkpoint from step N as `-cpi` to step N+1 causes an
+incompatible-checkpoint crash. Each step starts clean from the `.gro` output of the
+previous step.
+
+Individual dynamics steps do write a `.cpt` checkpoint (exposed as the optional
+`checkpoint` output of `GromacsRunWorkChain`). This is useful for resuming a crashed
+step, not for chaining steps. See *Restart / resume* below.
 
 **Entry point:** `tracy.run_membrane_md`
 
@@ -287,6 +295,50 @@ Or use the bundled example script:
 ```bash
 python examples/run_membrane_md_gromacs.py
 ```
+
+### Restart / resume
+
+If an MD step crashes (SLURM walltime, node failure), you can resume without re-running
+completed steps. Two mechanisms are available:
+
+**Automatic retry** — add `max_retries` to the protocol (default: 0):
+
+```yaml
+tracy:
+  max_retries: 2   # retry each failed step up to 2 times before giving up
+```
+
+**Manual resume** — after a crash, find the last successful step and re-submit starting
+from the failed step using the `initial_structure` input:
+
+```python
+from aiida import orm
+from aiida.engine import run_get_node
+from tracy.workflows.membrane_md import RunMembraneMDWorkChain
+
+failed_run = orm.load_node(<failed_pk>)
+last_good = max(
+    (c for c in failed_run.called
+     if c.is_finished_ok and c.process_label == "GromacsRunWorkChain"),
+    key=lambda n: n.pk,
+)
+
+_, node = run_get_node(
+    RunMembraneMDWorkChain,
+    md_input_bundle=orm.load_node(<bundle_pk>),
+    initial_structure=last_good.outputs.output_structure,
+    protocol=orm.Dict({"tracy": {
+        "expected_engine": "gromacs",
+        "md_steps": ["equilibration_4", "equilibration_5", "equilibration_6", "production"],
+        # ... rest of protocol
+    }}),
+    code=orm.load_code("gmx_mpi@cluster"),
+    options=orm.Dict({...}),
+)
+```
+
+The failed workchain's `md_report` output is available even on failure and contains
+`steps_run` (completed steps with PKs) and `failed_step` (name of the crashed step).
 
 ---
 
