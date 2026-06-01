@@ -91,10 +91,14 @@ class GromacsRunWorkChain(WorkChain):
         self.ctx.grompp_params = GromppParameters(dict={"o": f"{prefix}.tpr"})
 
         mdrun_dict = {
-            "c": f"{prefix}.gro",
-            "e": f"{prefix}.edr",
-            "g": f"{prefix}.log",
-            "o": f"{prefix}.trr",
+            "c":     f"{prefix}.gro",
+            "e":     f"{prefix}.edr",
+            "g":     f"{prefix}.log",
+            "o":     f"{prefix}.trr",
+            # Explicit 1 OMP thread per MPI rank prevents GROMACS from
+            # auto-detecting total node cores and oversubscribing when
+            # multiple jobs share the same node.
+            "ntomp": "1",
         }
         if self.ctx.write_cpt:
             mdrun_dict["cpo"] = f"{prefix}.cpt"
