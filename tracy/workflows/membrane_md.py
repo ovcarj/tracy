@@ -81,10 +81,11 @@ class RunMembraneMDWorkChain(WorkChain):
     def define(cls, spec):
         super().define(spec)
 
-        spec.input("md_input_bundle", valid_type=orm.FolderData)
-        spec.input("protocol",        valid_type=orm.Dict)
-        spec.input("code",            valid_type=orm.AbstractCode)
-        spec.input("options",         valid_type=orm.Dict, required=False)
+        spec.input("md_input_bundle",   valid_type=orm.FolderData)
+        spec.input("protocol",          valid_type=orm.Dict)
+        spec.input("code",              valid_type=orm.AbstractCode)
+        spec.input("options",           valid_type=orm.Dict,           required=False)
+        spec.input("initial_structure", valid_type=orm.SinglefileData, required=False)
 
         spec.outline(
             cls.setup,
@@ -139,6 +140,12 @@ class RunMembraneMDWorkChain(WorkChain):
         self.ctx.engine = engine
         self.ctx.current_step_index = 0
         self.ctx.completed_steps = []
+        self.ctx.max_retries = tracy_conf.get("max_retries", 0)
+        self.ctx.step_retries = {}
+
+        if "initial_structure" in self.inputs:
+            self.ctx.run_inputs["structure"] = self.inputs.initial_structure
+
         self.report(f"Setup complete. Engine={engine}, steps={[s['prefix'] for s in self.ctx.manifest]}")
 
     def should_run_next_step(self) -> bool:
@@ -186,7 +193,21 @@ class RunMembraneMDWorkChain(WorkChain):
         step = self.ctx.manifest[self.ctx.current_step_index]
 
         if not wc.is_finished_ok:
+            step_idx = self.ctx.current_step_index
+            retries_so_far = self.ctx.step_retries.get(step_idx, 0)
+            if retries_so_far < self.ctx.max_retries:
+                self.ctx.step_retries[step_idx] = retries_so_far + 1
+                self.report(
+                    f"Step '{step['name']}' failed (exit {wc.exit_status}), "
+                    f"retrying ({retries_so_far + 1}/{self.ctx.max_retries})."
+                )
+                return
             self.report(f"Step '{step['name']}' failed with exit status {wc.exit_status}")
+            self.out("md_report", orm.Dict({
+                "steps_run": self.ctx.completed_steps,
+                "final_step_exit_status": wc.exit_status,
+                "failed_step": step["name"],
+            }).store())
             return self.exit_codes.ERROR_MD_STEP_FAILED
 
         self.ctx.run_inputs["structure"] = wc.outputs.output_structure
