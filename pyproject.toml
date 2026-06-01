@@ -18,7 +18,7 @@ classifiers = [
     "Framework :: AiiDA",
 ]
 keywords = ["aiida", "plugin", "membrane", "molecular-dynamics", "charmm-gui"]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "aiida-core>=2.5,<3",
     "aiida-charmm-gui",
