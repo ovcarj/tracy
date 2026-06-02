@@ -734,6 +734,25 @@ remembrane show <uuid>
 remembrane plot <uuid> --components
 ```
 
+### [retrace](https://github.com/ovcarj/retrace)
+
+Database for electrostatic interaction energies between drug-like molecules and membrane potentials.
+
+`retrace` stores the output of `ElectrostaticEnergyWorkChain` — the E(z) profile
+of a molecule as it moves along the membrane normal, with its dipole oriented in
+both directions. Records cross-reference remolecule and remembrane entries for
+full traceability.
+
+```bash
+pip install "git+https://github.com/ovcarj/retrace#egg=retrace[aiida]"
+retrace init
+retrace import aiida --pk <ElectrostaticEnergyWorkChain_pk> \
+    --remolecule ~/.remolecule --remembrane ~/.remembrane
+retrace list
+retrace show <uuid>
+retrace query --inchikey <InChIKey>
+```
+
 ---
 
 ## Testing
