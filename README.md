@@ -166,7 +166,7 @@ new lipids are added regularly.
 
 | Code | Chains | Biological context |
 |---|---|---|
-| `TLCL2` | 18:2 × 4 | dominant species in mammalian IMM [[7]](https://doi.org/10.1016/S0163-7827(00)00005-9)[[2]](https://doi.org/10.1016/0005-2736(90)90036-n) |
+| `TLCL2` | 18:2 × 4 | dominant species in mammalian IMM [[7]](https://doi.org/10.1016/S0163-7827(00)00005-9)[[10]](https://doi.org/10.1194/jlr.m600551-jlr200) |
 | `TOCL2` | 18:1 × 4 | dominant species in yeast IMM [[8]](https://doi.org/10.1128/jb.173.6.2026-2034.1991) |
 | `TPCL2` | 16:0 × 4 | |
 | `TMCL2` | 14:0 × 4 | bacteria [[6]](https://doi.org/10.1146/annurev.biochem.66.1.199) |
@@ -190,31 +190,45 @@ Use suffix `1` (−1 e) only when modelling a partially protonated cardiolipin.
 
 ### Common compositions
 
-Molar percentages; ratios must sum to 100 per leaflet.
+Molar percentages; ratios must sum to 100 per leaflet. The compositions below are
+**simplified simulation models** — the cited papers report lipid class distributions
+at the whole-membrane level; exact molecular-species ratios and leaflet-specific
+asymmetries are modeling choices, not values directly taken from the cited papers.
+Mitochondrial inner/outer leaflet asymmetry is not well-characterised experimentally.
 
 ```yaml
-# Mammalian IMM — simple PC/PE/CL model [2,3,7]:
+# Mammalian IMM — simplified PC/PE/CL model:
+# IMM enriched in PE, PC (together ~80%), and CL (~15-20%) [2,3,7].
+# Leaflet split and TLCL2 species choice are modeling decisions.
 upper: "POPE:POPC:TLCL2=40:40:20"
 lower: "POPE:POPC:TLCL2=45:35:20"
 
-# Mammalian IMM — with poly-unsaturated acyl chains [2,3]:
+# Mammalian IMM — PUFA-enriched species model:
+# Mammalian mitochondrial PC and PE carry predominantly 18:2 (n-6) and 20:4 (n-6) chains [2,3].
+# SAPC, PLPC, SAPE are representative PUFA species; exact ratios are modeling choices.
 upper: "POPE:SAPC:PLPC:TLCL2=35:20:15:30"
 lower: "POPE:SAPC:PLPC:TLCL2=38:18:12:32"
 
-# Outer mitochondrial membrane (OMM) [2]:
+# Outer mitochondrial membrane (OMM) — simplified:
+# OMM is PC/PE-rich with minor PI and PS; CL very low [2].
+# Native OMM also contains SM and cholesterol, omitted here [9].
 upper: "POPC:POPE:POPI:POPS=50:30:10:10"
 lower: "POPC:POPE:POPI:POPS=48:32:12:8"
 
-# Yeast IMM (S. cerevisiae) [8]:
+# Yeast IMM (S. cerevisiae) — simplified:
+# S. cerevisiae IMM enriched in PE, PI, PC, and CL [8].
+# TOCL2 chosen as representative of yeast CL (predominantly 18:1 chains [8]).
 upper: "POPE:POPI:POPC:TOCL2=40:15:25:20"
 lower: "POPE:POPI:POPC:TOCL2=35:15:30:20"
 
-# Asymmetric plasma membrane — raft-forming model [4]:
-upper: "POPC:PSM:CHL1=25:40:35"           # outer leaflet: SM + cholesterol-rich
-lower: "POPE:POPS:POPC:CHL1=45:15:15:25"  # inner leaflet: PE + PS
+# Asymmetric plasma membrane — didactic raft-forming model:
+# Outer leaflet SM/cholesterol-enriched; inner leaflet PE/PS-enriched [4].
+# Species ratios are not derived from a primary source.
+upper: "POPC:PSM:CHL1=25:40:35"           # outer leaflet
+lower: "POPE:POPS:POPC:CHL1=45:15:15:25"  # inner leaflet
 ```
 
-References: [[1]](https://doi.org/10.1021/jp101759q) Klauda et al. *J Phys Chem B* 2010 · [[2]](https://doi.org/10.1016/0005-2736(90)90036-n) Hovius et al. *BBA* 1990 · [[3]](https://doi.org/10.1016/0005-2736(76)90353-9) Comte et al. *BBA* 1976 · [[4]](https://doi.org/10.1038/nrm2330) van Meer et al. *Nat Rev Mol Cell Biol* 2008 · [[5]](https://doi.org/10.1021/jz200167q) Pastor & MacKerell *J Phys Chem Lett* 2011 · [[6]](https://doi.org/10.1146/annurev.biochem.66.1.199) Dowhan *Annu Rev Biochem* 1997 · [[7]](https://doi.org/10.1016/S0163-7827(00)00005-9) Schlame et al. *Prog Lipid Res* 2000 · [[8]](https://doi.org/10.1128/jb.173.6.2026-2034.1991) Zinser et al. *J Bacteriol* 1991
+References: [[1]](https://doi.org/10.1021/jp101759q) Klauda et al. *J Phys Chem B* 2010 · [[2]](https://doi.org/10.1016/0005-2736(90)90036-n) Hovius et al. *BBA* 1990 · [[3]](https://doi.org/10.1016/0005-2736(76)90353-9) Comte et al. *BBA* 1976 · [[4]](https://doi.org/10.1038/nrm2330) van Meer et al. *Nat Rev Mol Cell Biol* 2008 · [[5]](https://doi.org/10.1021/jz200167q) Pastor & MacKerell *J Phys Chem Lett* 2011 · [[6]](https://doi.org/10.1146/annurev.biochem.66.1.199) Dowhan *Annu Rev Biochem* 1997 · [[7]](https://doi.org/10.1016/S0163-7827(00)00005-9) Schlame et al. *Prog Lipid Res* 2000 · [[8]](https://doi.org/10.1128/jb.173.6.2026-2034.1991) Zinser et al. *J Bacteriol* 1991 · [[9]](https://doi.org/10.3389/fmolb.2022.910936) Schiaffarino et al. *Front Mol Biosci* 2022 · [[10]](https://doi.org/10.1194/jlr.m600551-jlr200) Sparagna et al. *J Lipid Res* 2007
 
 > **Ion residue names (CHARMM36):** KCl → `POT` (K⁺) / `CLA` (Cl⁻); NaCl → `SOD` (Na⁺) / `CLA` (Cl⁻).
 > These names are required in the electrostatics protocol `new_index_groups` strings.

@@ -103,31 +103,42 @@ charmm_gui:
     # ------------------------------------------------------------------
     # Example compositions
     # ------------------------------------------------------------------
+    # NOTE: These are simplified simulation models.  The cited papers
+    # report lipid class distributions at the whole-membrane level;
+    # exact molecular-species ratios and leaflet asymmetries are
+    # modeling choices, not values directly reported in any single source.
+    # Mitochondrial inner/outer leaflet asymmetry is not well-characterised
+    # experimentally.
     #
-    # Mammalian inner mitochondrial membrane — simple PC/PE/CL model:
-    #   IMM: ~40 mol% PE, ~35 mol% PC, ~15-20 mol% CL, ~5 mol% PI
-    #   (Hovius et al. 1990; Comte et al. 1976)
+    # Mammalian IMM — simplified PC/PE/CL model:
+    #   IMM enriched in PE, PC (~80% combined), and CL (~15-20%)
+    #   (Hovius et al. BBA 1990; Comte et al. BBA 1976; Schlame et al. PLR 2000)
     #   upper: "POPE:POPC:TLCL2=40:40:20"
     #   lower: "POPE:POPC:TLCL2=45:35:20"
     #
-    # Mammalian IMM with poly-unsaturated acyl chains (more realistic):
-    #   Reflects the high content of 18:2 and 20:4 chains in mammalian CL
-    #   and the prevalence of 18:0/20:4 PC in heart and liver mitochondria.
+    # Mammalian IMM — PUFA-enriched species model:
+    #   Mammalian mitochondrial PC and PE carry predominantly 18:2 (n-6) and
+    #   20:4 (n-6) chains (Hovius 1990; Comte 1976).  SAPC, PLPC, SAPE are
+    #   representative PUFA species; exact ratios are modeling choices.
     #   upper: "POPE:SAPC:PLPC:TLCL2=35:20:15:30"
     #   lower: "POPE:SAPC:PLPC:TLCL2=38:18:12:32"
     #
-    # Mammalian outer mitochondrial membrane (OMM):
-    #   OMM: ~45-50% PC, ~25-30% PE, ~10% PI, ~5% PS, little CL
+    # Mammalian OMM — simplified:
+    #   OMM is PC/PE-rich with minor PI and PS; very low CL (Hovius 1990).
+    #   Native OMM also contains SM and cholesterol, omitted here for simplicity
+    #   (Schiaffarino et al. Front Mol Biosci 2022).
     #   upper: "POPC:POPE:POPI:POPS=50:30:10:10"
     #   lower: "POPC:POPE:POPI:POPS=48:32:12:8"
     #
-    # Yeast inner mitochondrial membrane (S. cerevisiae):
-    #   Yeast CL is predominantly tetraoleoyl (18:1×4) not tetralinoleoyl.
+    # Yeast IMM (S. cerevisiae) — simplified:
+    #   S. cerevisiae IMM enriched in PE, PI, PC, and CL (Zinser et al. JBacteriol 1991).
+    #   TOCL2 (tetraoleoyl CL) chosen as representative of yeast CL acyl composition.
     #   upper: "POPE:POPI:POPC:TOCL2=40:15:25:20"
     #   lower: "POPE:POPI:POPC:TOCL2=35:15:30:20"
     #
-    # Mammalian plasma membrane — asymmetric raft-forming model:
-    #   Outer leaflet enriched in SM + cholesterol; inner leaflet PE-rich.
+    # Mammalian plasma membrane — didactic raft-forming model:
+    #   Outer leaflet SM/cholesterol-enriched; inner leaflet PE/PS-enriched
+    #   (van Meer et al. NRMCB 2008).  Species ratios not from a primary source.
     #   upper: "POPC:PSM:CHL1=25:40:35"
     #   lower: "POPE:POPS:POPC:CHL1=45:15:15:25"
     #
