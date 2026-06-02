@@ -139,7 +139,7 @@ new lipids are added regularly.
 | `PAPC` | 16:0 / 20:4 n-6 | arachidonoyl |
 | `SAPC` | 18:0 / 20:4 n-6 | abundant in mammalian IMM [[2]](https://doi.org/10.1016/0005-2736(90)90036-n)[[3]](https://doi.org/10.1016/0005-2736(76)90353-9) |
 | `PDPC` | 16:0 / 22:6 n-3 | DHA (docosahexaenoyl) |
-| `SDPC` | 18:0 / 22:6 n-3 | DHA; enriched in brain and retinal mitochondria [[4]](https://doi.org/10.1038/nrm2330) |
+| `SDPC` | 18:0 / 22:6 n-3 | DHA; enriched in brain and retinal membranes [[4]](https://doi.org/10.1038/nrm2330) |
 
 **Phosphatidylethanolamines (PE) — neutral**
 
