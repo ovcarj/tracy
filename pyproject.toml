@@ -22,6 +22,7 @@ requires-python = ">=3.11"
 dependencies = [
     "aiida-core>=2.5,<3",
     "aiida-charmm-gui",
+    "scipy>=1.7",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +53,7 @@ dev = [
 "tracy.molecule_charges"           = "tracy.workflows.molecule_charges:MoleculeChargeDistributionWorkChain"
 "tracy.orca_preopt"                = "tracy.workflows.orca_preopt:OrcaPreoptWorkChain"
 "tracy.orca_opt"                   = "tracy.workflows.orca_opt:OrcaOptWorkChain"
+"tracy.electrostatic_energy"       = "tracy.workflows.electrostatic_energy:ElectrostaticEnergyWorkChain"
 
 [tool.hatch.version]
 path = "tracy/__init__.py"
