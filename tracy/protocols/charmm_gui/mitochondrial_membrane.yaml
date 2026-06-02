@@ -39,11 +39,11 @@ charmm_gui:
     #
     # Option B — custom asymmetric composition (API fields: upper, lower).
     # Format: "LIP1:LIP2:LIP3=ratio1:ratio2:ratio3"
-    # CHARMM36 lipid names (examples): POPE, POPC, POPS, POPI, CDL2
+    # CHARMM36 lipid names (examples): POPE, POPC, POPS, POPI, TLCL2
     # (cardiolipin), CHL1 (cholesterol), DPPC, DPPS, NSM (sphingomyelin).
     # Verify names against the CHARMM-GUI lipid library before submitting.
-    upper: "POPE:POPC:CDL2=40:40:20"
-    lower: "POPE:POPC:CDL2=45:35:20"
+    upper: "POPE:POPC:TLCL2=40:40:20"
+    lower: "POPE:POPC:TLCL2=45:35:20"
 
     # ------------------------------------------------------------------
     # System type

@@ -16,8 +16,8 @@ charmm_gui:
     # Custom asymmetric composition.
     # Format: "LIP1:LIP2:LIP3=ratio1:ratio2:ratio3"
     # Use membtype (e.g. membtype: PMm) instead for a preset system.
-    upper: "POPE:POPC:CDL2=40:40:20"
-    lower: "POPE:POPC:CDL2=45:35:20"
+    upper: "POPE:POPC:TLCL2=40:40:20"
+    lower: "POPE:POPC:TLCL2=45:35:20"
 
     membrane_only: true
 
