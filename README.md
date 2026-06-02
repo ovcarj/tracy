@@ -742,7 +742,7 @@ remembrane plot <uuid> --components
 pytest tests/
 ```
 
-Tests do not require a live CHARMM-GUI connection or a GROMACS installation.
+Tests do not require a live CHARMM-GUI connection, a GROMACS installation, or an ORCA installation.
 
 ## License
 
