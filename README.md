@@ -10,6 +10,7 @@ AiiDA-based workflow package for building and simulating mitochondrial membrane 
 CHARMM-GUI membrane construction  →  BuildMembraneWorkChain
 GROMACS molecular dynamics        →  RunMembraneMDWorkChain
 Electrostatic potential           →  ComputeMembranePotentialWorkChain
+Molecular charge distribution     →  MoleculeChargeDistributionWorkChain
 ```
 
 Each stage is a separate, independently testable WorkChain.
@@ -27,6 +28,13 @@ For GROMACS MD and electrostatics (optional):
   `nstxout-compressed > 0`, and sandbox subdirectory creation for `itp_dirs`/`plumed_dirs`
 - GROMACS 2021.7
 
+For molecular charge distribution (optional):
+- [aiida-orca](https://github.com/ovcarj/aiida-orca/tree/update-orca-parser), branch `update-orca-parser` (fork of ezpzbz/aiida-orca)
+  — contains two fixes required for ORCA 6 + XTB support: RESP charge extraction from
+  `RESP Charges` output section (commit `4bad37f`), and XTB energy parsing for ORCA 6
+  calculations where there is no SCF block (commit `50afef8`)
+- ORCA 6.x (tested with 6.1.1)
+
 ## Installation
 
 ```bash
@@ -37,20 +45,26 @@ With GROMACS support:
 
 ```bash
 pip install -e ".[gromacs]"
-```
-
-Install the patched aiida-gromacs from the required branch:
-
-```bash
 pip install -e "git+https://github.com/ovcarj/aiida-gromacs.git@fix-itp-dirs-upload#egg=aiida-gromacs"
 ```
+
+With ORCA molecular charge support:
+
+```bash
+pip install -e ".[orca]"
+pip install -e "git+https://github.com/ovcarj/aiida-orca.git@update-orca-parser#egg=aiida-orca"
+```
+
+The `aiida-orca` fork (`update-orca-parser` branch) is required — the PyPI version does not
+support ORCA 6 RESP charges or XTB energy parsing.
 
 Register the AiiDA entry points after installation:
 
 ```bash
 verdi plugin list aiida.workflows
-# should show: tracy.build_membrane, tracy.gromacs_run, tracy.run_membrane_md,
-#              tracy.compute_membrane_potential, tracy.create_index_groups
+# membrane: tracy.build_membrane, tracy.gromacs_run, tracy.run_membrane_md,
+#           tracy.compute_membrane_potential, tracy.create_index_groups
+# charges:  tracy.molecule_charges, tracy.orca_preopt, tracy.orca_opt
 verdi plugin list aiida.calculations
 # should show: tracy.trjconv, tracy.potential, tracy.select_groups
 ```
@@ -516,6 +530,166 @@ After:   [ MEMB ]  [ SOLV ]  [ SYSTEM ]  [ Water ]  [ ION ]
 Internally runs `SelectGroupsCalculation` (`gmx select`) to create the new groups,
 then merges with the original index via `merge_index_files` (plain-text concatenation,
 tracked as an AiiDA `calcfunction`).
+
+---
+
+## MoleculeChargeDistributionWorkChain
+
+Computes per-atom RESP charge distributions for drug-like molecules.
+Engine-agnostic at the top level: dispatches to ORCA sub-WorkChains based on
+`protocol.tracy.expected_engine`.
+
+Pipeline:
+1. Conformer generation (`generate_conformers` calcfunction, RDKit ETKDG)
+2. XTB pre-optimisation in parallel (`OrcaPreoptWorkChain`) — optional
+3. DFT geometry optimisation + RESP charges in parallel (`OrcaOptWorkChain`)
+4. Return lowest-energy result
+
+**Entry point:** `tracy.molecule_charges`
+
+**Inputs**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `smiles` | `Str` | no† | SMILES string for conformer generation |
+| `conformers` | `FolderData` | no† | Pre-generated XYZ conformers (skips step 1) |
+| `protocol` | `Dict` | yes | Tracy protocol (see below) |
+| `code` | `AbstractCode` | yes | ORCA code registered in AiiDA |
+| `options` | `Dict` | no | AiiDA scheduler options |
+
+†Either `smiles` or `conformers` must be provided.
+
+**Outputs**
+
+| Name | Type | Description |
+|---|---|---|
+| `relaxed_structure` | `StructureData` | Lowest-energy DFT-relaxed geometry |
+| `output_parameters` | `Dict` | ORCA output including `atomcharges['resp']` |
+| `charge_report` | `Dict` | Provenance metadata (preopt pk, opt pk, best energy) |
+
+### Protocol format
+
+```yaml
+tracy:
+  conformer_engine: rdkit    # default; only implementation currently
+  expected_engine: orca      # default; only implementation currently
+  n_conformers: 20           # RDKit ETKDG
+  random_seed: 42
+  run_preopt: true           # set false to skip XTB and go directly to DFT
+  preopt_top_k: 5            # top-K lowest-energy conformers passed to DFT
+  charge: 0
+  multiplicity: 1
+orca:
+  preopt:
+    method: XTB2
+    input_blocks:
+      pal:
+        nproc: 4             # must match num_mpiprocs_per_machine in scheduler options
+  opt:
+    method: B3LYP
+    basis: def2-SVP
+    dispersion: D3BJ
+    resp_keyword: RESP       # ORCA 6 native RESP keyword; produces atomcharges['resp']
+    input_blocks:
+      pal:
+        nproc: 4
+```
+
+### Submitting
+
+```python
+from aiida import load_profile, orm
+from aiida.engine import submit
+
+load_profile()
+
+ORCA_OPTIONS = orm.Dict({
+    "resources": {"num_machines": 1, "num_mpiprocs_per_machine": 4},
+    "queue_name": "cm",
+    "max_wallclock_seconds": 7200,
+    "withmpi": False,   # ORCA manages its own MPI
+})
+
+PROTOCOL = orm.Dict({
+    "tracy": {
+        "conformer_engine": "rdkit", "expected_engine": "orca",
+        "n_conformers": 20, "random_seed": 42,
+        "run_preopt": True, "preopt_top_k": 5,
+        "charge": 0, "multiplicity": 1,
+    },
+    "orca": {
+        "preopt": {"method": "XTB2", "input_blocks": {"pal": {"nproc": 4}}},
+        "opt": {
+            "method": "B3LYP", "basis": "def2-SVP", "dispersion": "D3BJ",
+            "resp_keyword": "RESP",
+            "input_blocks": {"pal": {"nproc": 4}},
+        },
+    },
+})
+
+from tracy.workflows.molecule_charges import MoleculeChargeDistributionWorkChain
+wc = submit(
+    MoleculeChargeDistributionWorkChain,
+    smiles=orm.Str("CCO"),
+    protocol=PROTOCOL,
+    code=orm.load_code("orca@cluster"),
+    options=ORCA_OPTIONS,
+)
+print(f"pk={wc.pk}")
+```
+
+### Inspecting RESP charges
+
+```python
+from aiida import load_profile, orm
+load_profile()
+
+n = orm.load_node(<pk>)
+p = n.outputs.output_parameters.get_dict()
+print("RESP charges:", p["atomcharges"]["resp"])
+print("Atoms:       ", p["atomnos"])
+print("Best energy: ", n.outputs.charge_report.get_dict()["best_energy"])
+```
+
+### ORCA operational notes
+
+**RESP keyword**: use `! RESP` (ORCA 6 native, first-class keyword). Do not use
+`! CHELPG` with `%chelpg RestrictedFit True end` — that is an ORCA 5 pattern and
+produces `atomcharges['chelpg']`, not `['resp']`.
+
+**MPI slots**: ORCA manages its own MPI (`withmpi: false` in AiiDA).
+`num_mpiprocs_per_machine` in scheduler options **must equal** `nproc` in `%pal`.
+Mismatching causes the SLURM job to allocate too few slots and ORCA's `mpirun -np N`
+call fails with "not enough slots".
+
+**Daemon restart**: after editing WorkChain source code, run `verdi daemon restart`.
+The daemon caches Python imports; code changes are not picked up until restart.
+
+---
+
+## OrcaPreoptWorkChain
+
+Parallel XTB pre-optimisation of conformers via ORCA. Accepts a `FolderData` of XYZ
+files, submits one `OrcaBaseWorkChain` per conformer in parallel, ranks by final XTB
+energy, and returns the top-K relaxed structures as `StructureData`.
+
+Individual conformer failures are tolerated (unphysical geometries are expected to fail);
+the WorkChain succeeds if at least `top_k` converge.
+
+**Entry point:** `tracy.orca_preopt`
+
+---
+
+## OrcaOptWorkChain
+
+Parallel DFT geometry optimisation + RESP charge calculation via ORCA. Accepts a
+dynamic namespace of `StructureData` nodes (e.g. from `OrcaPreoptWorkChain`), submits
+one `OrcaBaseWorkChain` per structure, and returns the lowest-energy converged result.
+
+`opt_report` includes `charges_key` so downstream consumers know which
+`atomcharges` key to read (e.g. `'resp'` for `! RESP`, `'chelpg'` for `! CHELPG`).
+
+**Entry point:** `tracy.orca_opt`
 
 ---
 
