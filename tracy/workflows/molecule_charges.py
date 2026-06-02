@@ -140,12 +140,15 @@ class MoleculeChargeDistributionWorkChain(WorkChain):
         p = self.ctx.protocol.get('tracy', {})
         orca_conf = self.ctx.protocol.get('orca', {}).get('preopt', {})
 
-        preopt_params = orm.Dict({
+        preopt_dict: dict = {
             'charge': p.get('charge', 0),
             'multiplicity': p.get('multiplicity', 1),
             'method': orca_conf.get('method', 'XTB2'),
             'top_k': p.get('preopt_top_k', 5),
-        })
+        }
+        if 'input_blocks' in orca_conf:
+            preopt_dict['input_blocks'] = orca_conf['input_blocks']
+        preopt_params = orm.Dict(preopt_dict)
 
         inputs = {
             'conformers': conformers,
@@ -184,14 +187,17 @@ class MoleculeChargeDistributionWorkChain(WorkChain):
         p = self.ctx.protocol.get('tracy', {})
         orca_conf = self.ctx.protocol.get('orca', {}).get('opt', {})
 
-        opt_params = orm.Dict({
+        opt_dict: dict = {
             'charge': p.get('charge', 0),
             'multiplicity': p.get('multiplicity', 1),
             'method': orca_conf.get('method', 'B3LYP'),
             'basis': orca_conf.get('basis', 'def2-SVP'),
             'dispersion': orca_conf.get('dispersion', 'D3BJ'),
             'resp_keyword': orca_conf.get('resp_keyword', 'CHELPG'),
-        })
+        }
+        if 'input_blocks' in orca_conf:
+            opt_dict['input_blocks'] = orca_conf['input_blocks']
+        opt_params = orm.Dict(opt_dict)
 
         inputs = {
             'structures': self.ctx.opt_structures,

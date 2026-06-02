@@ -58,11 +58,14 @@ class OrcaOptWorkChain(WorkChain):
         dispersion   = p.get('dispersion', 'D3BJ')
         resp_keyword = p.get('resp_keyword', 'CHELPG')
 
-        self.ctx.orca_params = orm.Dict({
+        orca_dict: dict = {
             'charge': p.get('charge', 0),
             'multiplicity': p.get('multiplicity', 1),
             'input_keywords': [method, basis, dispersion, 'OPT', resp_keyword],
-        })
+        }
+        if 'input_blocks' in p:
+            orca_dict['input_blocks'] = p['input_blocks']
+        self.ctx.orca_params = orm.Dict(orca_dict)
         self.ctx.orca_params.store()
         self.report(
             f"Setup: {len(self.inputs.structures)} structures, "

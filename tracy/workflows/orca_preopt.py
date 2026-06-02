@@ -59,11 +59,14 @@ class OrcaPreoptWorkChain(WorkChain):
 
         p = self.inputs.parameters.get_dict()
         self.ctx.top_k = p.get('top_k', 5)
-        self.ctx.orca_params = orm.Dict({
+        orca_dict: dict = {
             'charge': p.get('charge', 0),
             'multiplicity': p.get('multiplicity', 1),
             'input_keywords': [p.get('method', 'XTB2'), 'OPT'],
-        })
+        }
+        if 'input_blocks' in p:
+            orca_dict['input_blocks'] = p['input_blocks']
+        self.ctx.orca_params = orm.Dict(orca_dict)
         self.ctx.orca_params.store()
 
         self.ctx.structures = {}
