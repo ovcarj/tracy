@@ -17,7 +17,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install non-PyPI dependencies
-        run: pip install "git+https://github.com/ovcarj/aiida-charmm-gui.git"
+        run: |
+          pip install "git+https://github.com/ovcarj/aiida-charmm-gui.git"
+          pip install "git+https://github.com/ovcarj/aiida-orca.git@update-orca-parser"
       - name: Install
         run: pip install -e ".[dev]"
       - name: Run tests
