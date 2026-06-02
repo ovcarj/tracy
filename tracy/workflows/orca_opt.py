@@ -57,6 +57,8 @@ class OrcaOptWorkChain(WorkChain):
         basis        = p.get('basis', 'def2-SVP')
         dispersion   = p.get('dispersion', 'D3BJ')
         resp_keyword = p.get('resp_keyword', 'CHELPG')
+        # atomcharges key in output_parameters matches the lowercase keyword
+        self.ctx.charges_key = resp_keyword.lower()
 
         orca_dict: dict = {
             'charge': p.get('charge', 0),
@@ -69,7 +71,7 @@ class OrcaOptWorkChain(WorkChain):
         self.ctx.orca_params.store()
         self.report(
             f"Setup: {len(self.inputs.structures)} structures, "
-            f"method={method}/{basis}, RESP keyword={resp_keyword}"
+            f"method={method}/{basis}, charges keyword={resp_keyword} (key='{self.ctx.charges_key}')"
         )
 
     def run_opt(self):
@@ -102,8 +104,11 @@ class OrcaOptWorkChain(WorkChain):
                 self.report(f"{key}: geometry did not converge, skipping.")
                 continue
             atomcharges = params.get('atomcharges', {})
-            if 'resp' not in atomcharges:
-                self.report(f"{key}: RESP charges absent from output, skipping.")
+            if self.ctx.charges_key not in atomcharges:
+                self.report(
+                    f"{key}: '{self.ctx.charges_key}' charges absent from output "
+                    f"(present: {list(atomcharges.keys())}), skipping."
+                )
                 continue
             if not hasattr(wc.outputs, 'relaxed_structure'):
                 self.report(f"{key}: no relaxed_structure output, skipping.")
@@ -139,4 +144,5 @@ class OrcaOptWorkChain(WorkChain):
             'n_converged': len(self.ctx.all_opt_results),
             'best_key': self.ctx.best['key'],
             'best_energy': self.ctx.best['energy'],
+            'charges_key': self.ctx.charges_key,
         }).store())
