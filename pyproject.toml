@@ -27,6 +27,7 @@ dependencies = [
 [project.optional-dependencies]
 gromacs = ["aiida-gromacs"]
 rdkit = ["rdkit>=2023.3"]
+orca = ["aiida-orca"]
 dev = [
     "pytest>=7.0",
     "pyyaml",
@@ -48,6 +49,9 @@ dev = [
 "tracy.run_membrane_md"            = "tracy.workflows.membrane_md:RunMembraneMDWorkChain"
 "tracy.compute_membrane_potential" = "tracy.workflows.electrostatics:ComputeMembranePotentialWorkChain"
 "tracy.create_index_groups"        = "tracy.workflows.create_index_groups:CreateIndexGroupsWorkChain"
+"tracy.molecule_charges"           = "tracy.workflows.molecule_charges:MoleculeChargeDistributionWorkChain"
+"tracy.orca_preopt"                = "tracy.workflows.orca_preopt:OrcaPreoptWorkChain"
+"tracy.orca_opt"                   = "tracy.workflows.orca_opt:OrcaOptWorkChain"
 
 [tool.hatch.version]
 path = "tracy/__init__.py"
