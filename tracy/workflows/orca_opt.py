@@ -6,8 +6,6 @@ from aiida import orm
 from aiida.engine import ExitCode, ToContext, WorkChain
 from aiida.plugins import WorkflowFactory
 
-OrcaBaseWorkChain = WorkflowFactory('orca.base')
-
 
 class OrcaOptWorkChain(WorkChain):
     """Optimise structures with DFT and compute RESP charges via ORCA.
@@ -83,6 +81,7 @@ class OrcaOptWorkChain(WorkChain):
         )
 
     def run_opt(self):
+        OrcaBaseWorkChain = WorkflowFactory('orca.base')
         options = self.inputs.options.get_dict() if 'options' in self.inputs else {}
 
         calcs = {}

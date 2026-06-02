@@ -6,6 +6,7 @@ import pytest
 from aiida import orm
 from aiida.engine import WorkChain
 
+pytest.importorskip("aiida_orca", reason="aiida-orca not installed")
 from tracy.workflows.orca_preopt import OrcaPreoptWorkChain
 
 

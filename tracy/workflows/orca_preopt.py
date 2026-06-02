@@ -9,8 +9,6 @@ from aiida import orm
 from aiida.engine import ExitCode, ToContext, WorkChain
 from aiida.plugins import WorkflowFactory
 
-OrcaBaseWorkChain = WorkflowFactory('orca.base')
-
 
 class OrcaPreoptWorkChain(WorkChain):
     """Pre-optimise conformers in parallel using XTB via ORCA.
@@ -87,6 +85,7 @@ class OrcaPreoptWorkChain(WorkChain):
         self.report(f"Setup: {len(self.ctx.structures)} conformers, top_k={self.ctx.top_k}, solvent={solvent_label}")
 
     def run_preopt(self):
+        OrcaBaseWorkChain = WorkflowFactory('orca.base')
         options = self.inputs.options.get_dict() if 'options' in self.inputs else {}
 
         calcs = {}
