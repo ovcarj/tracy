@@ -97,18 +97,21 @@ Builds a membrane via CHARMM-GUI Quick Bilayer and extracts a GROMACS-ready inpu
 
 ```yaml
 system:
-  name: my_membrane
-  description: Brief description
+  name: mitochondrial_inner_membrane
+  description: Mammalian IMM — asymmetric PC/PE/cardiolipin bilayer
 
 charmm_gui:
   module: membrane_builder
   quick_bilayer:
-    membtype: PMm
+    upper: "POPE:POPC:TLCL2=40:40:20"   # IMS-facing leaflet
+    lower: "POPE:POPC:TLCL2=45:35:20"   # matrix-facing leaflet
     membrane_only: true
     margin: 20.0
     wdist: 22.5
     ion_conc: 0.15
-    ion_type: NaCl
+    ion_type: KCl
+    run_ff_converter: true
+    temperature: 310.15
 
 tracy:
   expected_engine: gromacs
@@ -129,44 +132,44 @@ new lipids are added regularly.
 
 | Code | Acyl chains | Notes |
 |---|---|---|
-| `DPPC` | 16:0 / 16:0 | gel phase at 298 K |
-| `POPC` | 16:0 / 18:1 | most common model PC |
+| `DPPC` | 16:0 / 16:0 | gel phase at 298 K [[1]](https://doi.org/10.1021/jp101759q) |
+| `POPC` | 16:0 / 18:1 | most common model PC [[1]](https://doi.org/10.1021/jp101759q) |
 | `DOPC` | 18:1 / 18:1 | |
-| `PLPC` | 16:0 / 18:2 n-6 | common in mitochondria |
+| `PLPC` | 16:0 / 18:2 n-6 | enriched in mammalian IMM [[2]](https://doi.org/10.1016/0005-2736(90)90036-n)[[3]](https://doi.org/10.1016/0005-2736(76)90353-9) |
 | `PAPC` | 16:0 / 20:4 n-6 | arachidonoyl |
-| `SAPC` | 18:0 / 20:4 n-6 | abundant in mammalian IMM |
-| `PDPC` | 16:0 / 22:6 n-3 | DHA |
-| `SDPC` | 18:0 / 22:6 n-3 | common in mammalian mitochondria |
+| `SAPC` | 18:0 / 20:4 n-6 | abundant in mammalian IMM [[2]](https://doi.org/10.1016/0005-2736(90)90036-n)[[3]](https://doi.org/10.1016/0005-2736(76)90353-9) |
+| `PDPC` | 16:0 / 22:6 n-3 | DHA (docosahexaenoyl) |
+| `SDPC` | 18:0 / 22:6 n-3 | DHA; enriched in brain and retinal mitochondria [[4]](https://doi.org/10.1038/nrm2330) |
 
 **Phosphatidylethanolamines (PE) — neutral**
 
 | Code | Acyl chains | Notes |
 |---|---|---|
 | `DPPE` | 16:0 / 16:0 | |
-| `POPE` | 16:0 / 18:1 | most common model PE |
+| `POPE` | 16:0 / 18:1 | most common model PE [[5]](https://doi.org/10.1021/jz200167q) |
 | `DOPE` | 18:1 / 18:1 | |
-| `PLPE` | 16:0 / 18:2 n-6 | |
-| `SAPE` | 18:0 / 20:4 n-6 | |
-| `SDPE` | 18:0 / 22:6 n-3 | common in mammalian mitochondria |
+| `PLPE` | 16:0 / 18:2 n-6 | enriched in mammalian IMM [[2]](https://doi.org/10.1016/0005-2736(90)90036-n) |
+| `SAPE` | 18:0 / 20:4 n-6 | enriched in mammalian IMM [[2]](https://doi.org/10.1016/0005-2736(90)90036-n) |
+| `SDPE` | 18:0 / 22:6 n-3 | DHA-PE; enriched in brain and retinal membranes [[4]](https://doi.org/10.1038/nrm2330) |
 
 **Negatively charged lipids**
 
 | Code | Type | Charge | Notes |
 |---|---|---|---|
-| `POPS` | PS | −1 | preferentially inner leaflet |
+| `POPS` | PS | −1 | preferentially inner (cytoplasmic) leaflet [[4]](https://doi.org/10.1038/nrm2330) |
 | `DOPS` | PS | −1 | |
-| `POPG` | PG | −1 | common in bacteria and chloroplasts |
+| `POPG` | PG | −1 | major acidic lipid in bacteria and chloroplasts [[6]](https://doi.org/10.1146/annurev.biochem.66.1.199) |
 | `DOPG` | PG | −1 | |
-| `POPI` | PI | −1 | OMM, ER, plasma membrane |
+| `POPI` | PI | −1 | OMM, ER, and plasma membrane [[4]](https://doi.org/10.1038/nrm2330) |
 
 **Cardiolipins (CL) — use suffix `2` (−2 e) at physiological pH**
 
 | Code | Chains | Biological context |
 |---|---|---|
-| `TLCL2` | 18:2 × 4 | dominant in mammalian IMM |
-| `TOCL2` | 18:1 × 4 | dominant in yeast IMM |
+| `TLCL2` | 18:2 × 4 | dominant species in mammalian IMM [[7]](https://doi.org/10.1016/S0163-7827(00)00005-9)[[2]](https://doi.org/10.1016/0005-2736(90)90036-n) |
+| `TOCL2` | 18:1 × 4 | dominant species in yeast IMM [[8]](https://doi.org/10.1128/jb.173.6.2026-2034.1991) |
 | `TPCL2` | 16:0 × 4 | |
-| `TMCL2` | 14:0 × 4 | bacteria |
+| `TMCL2` | 14:0 × 4 | bacteria [[6]](https://doi.org/10.1146/annurev.biochem.66.1.199) |
 
 Use suffix `1` (−1 e) only when modelling a partially protonated cardiolipin.
 
@@ -174,7 +177,7 @@ Use suffix `1` (−1 e) only when modelling a partially protonated cardiolipin.
 
 | Code | N-acyl | Notes |
 |---|---|---|
-| `PSM` | 16:0 | most common in mammalian plasma membrane |
+| `PSM` | 16:0 | most abundant SM species in mammalian plasma membrane [[4]](https://doi.org/10.1038/nrm2330) |
 | `SSM` | 18:0 | |
 | `BNSM` | 22:0 | |
 
@@ -182,32 +185,36 @@ Use suffix `1` (−1 e) only when modelling a partially protonated cardiolipin.
 
 | Code | Name |
 |---|---|
-| `CHL1` | Cholesterol (mammalian) |
-| `ERG` | Ergosterol (yeast/fungal) |
+| `CHL1` | Cholesterol (mammalian) [[4]](https://doi.org/10.1038/nrm2330) |
+| `ERG` | Ergosterol (yeast/fungal) [[8]](https://doi.org/10.1128/jb.173.6.2026-2034.1991) |
 
 ### Common compositions
 
+Molar percentages; ratios must sum to 100 per leaflet.
+
 ```yaml
-# Mammalian inner mitochondrial membrane (simple PC/PE/CL model):
+# Mammalian IMM — simple PC/PE/CL model [2,3,7]:
 upper: "POPE:POPC:TLCL2=40:40:20"
 lower: "POPE:POPC:TLCL2=45:35:20"
 
-# Mammalian IMM with poly-unsaturated acyl chains:
+# Mammalian IMM — with poly-unsaturated acyl chains [2,3]:
 upper: "POPE:SAPC:PLPC:TLCL2=35:20:15:30"
 lower: "POPE:SAPC:PLPC:TLCL2=38:18:12:32"
 
-# Outer mitochondrial membrane (OMM):
+# Outer mitochondrial membrane (OMM) [2]:
 upper: "POPC:POPE:POPI:POPS=50:30:10:10"
 lower: "POPC:POPE:POPI:POPS=48:32:12:8"
 
-# Yeast inner mitochondrial membrane:
+# Yeast IMM (S. cerevisiae) [8]:
 upper: "POPE:POPI:POPC:TOCL2=40:15:25:20"
 lower: "POPE:POPI:POPC:TOCL2=35:15:30:20"
 
-# Asymmetric plasma membrane (mammalian, raft-forming):
-upper: "POPC:PSM:CHL1=25:40:35"          # outer leaflet: SM + cholesterol-rich
-lower: "POPE:POPS:POPC:CHL1=45:15:15:25" # inner leaflet: PE + PS
+# Asymmetric plasma membrane — raft-forming model [4]:
+upper: "POPC:PSM:CHL1=25:40:35"           # outer leaflet: SM + cholesterol-rich
+lower: "POPE:POPS:POPC:CHL1=45:15:15:25"  # inner leaflet: PE + PS
 ```
+
+References: [[1]](https://doi.org/10.1021/jp101759q) Klauda et al. *J Phys Chem B* 2010 · [[2]](https://doi.org/10.1016/0005-2736(90)90036-n) Hovius et al. *BBA* 1990 · [[3]](https://doi.org/10.1016/0005-2736(76)90353-9) Comte et al. *BBA* 1976 · [[4]](https://doi.org/10.1038/nrm2330) van Meer et al. *Nat Rev Mol Cell Biol* 2008 · [[5]](https://doi.org/10.1021/jz200167q) Pastor & MacKerell *J Phys Chem Lett* 2011 · [[6]](https://doi.org/10.1146/annurev.biochem.66.1.199) Dowhan *Annu Rev Biochem* 1997 · [[7]](https://doi.org/10.1016/S0163-7827(00)00005-9) Schlame et al. *Prog Lipid Res* 2000 · [[8]](https://doi.org/10.1128/jb.173.6.2026-2034.1991) Zinser et al. *J Bacteriol* 1991
 
 > **Ion residue names (CHARMM36):** KCl → `POT` (K⁺) / `CLA` (Cl⁻); NaCl → `SOD` (Na⁺) / `CLA` (Cl⁻).
 > These names are required in the electrostatics protocol `new_index_groups` strings.
