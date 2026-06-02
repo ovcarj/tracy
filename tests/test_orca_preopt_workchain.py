@@ -9,6 +9,35 @@ from aiida.engine import WorkChain
 from tracy.workflows.orca_preopt import OrcaPreoptWorkChain
 
 
+# ---------------------------------------------------------------------------
+# Solvent keyword logic (pure-Python, no AiiDA profile needed)
+# ---------------------------------------------------------------------------
+
+
+def _build_preopt_keywords(method: str, solvent: str | None) -> list[str]:
+    """Mirror the keyword-building logic from OrcaPreoptWorkChain.setup()."""
+    keywords = [method, 'OPT']
+    if solvent:
+        keywords.append(f'ALPB({solvent})')
+    return keywords
+
+
+def test_vacuum_preopt_keywords():
+    kw = _build_preopt_keywords('XTB2', None)
+    assert kw == ['XTB2', 'OPT']
+    assert not any('ALPB' in k for k in kw)
+
+
+def test_water_preopt_adds_alpb():
+    kw = _build_preopt_keywords('XTB2', 'Water')
+    assert 'ALPB(Water)' in kw
+
+
+def test_arbitrary_solvent_preopt():
+    kw = _build_preopt_keywords('XTB2', 'Methanol')
+    assert 'ALPB(Methanol)' in kw
+
+
 def test_is_workchain_subclass():
     assert issubclass(OrcaPreoptWorkChain, WorkChain)
 

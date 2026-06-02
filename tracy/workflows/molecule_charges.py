@@ -9,37 +9,34 @@ from aiida import orm
 from aiida.engine import ExitCode, ToContext, WorkChain, if_
 
 
+def _solvent_key(solvent: str | None) -> str:
+    """Normalise a solvent name to a safe dict/output key."""
+    return solvent.lower() if solvent else 'vacuum'
+
+
 class MoleculeChargeDistributionWorkChain(WorkChain):
     """Compute per-atom charge distributions for a molecule.
 
     Pipeline: conformer generation → (optional) pre-optimisation → geometry
-    optimisation + charge calculation.
+    optimisation + charge calculation.  When ``tracy.solvents`` lists multiple
+    solvents, pre-opt and DFT-opt are submitted in parallel for each solvent;
+    results are exposed under ``results.<solvent_key>.*``.
 
     The engine for each step is selected via ``protocol.tracy``:
 
     - ``conformer_engine``: which conformer generator to use (default: ``rdkit``)
-    - ``expected_engine``: which QC code to use for pre-opt and opt (default: ``orca``)
-
-    The current implementations are:
-    - conformers: RDKit ETKDG (``tracy.calculations.conformers.generate_conformers``)
-    - pre-opt + opt: ORCA (``OrcaPreoptWorkChain``, ``OrcaOptWorkChain``)
+    - ``expected_engine``: which QC code to use (default: ``orca``)
+    - ``solvents``: list of solvents to compute (default: ``[null]`` = vacuum only)
+      null → vacuum (no solvation keyword), string → ALPB/CPCM implicit solvent
 
     Adding a new engine means implementing new WorkChains and adding one branch to
     ``setup`` — this WorkChain does not change.
 
-    Inputs
-    ------
-    smiles      : Str         — SMILES to generate conformers from (omit if ``conformers`` provided)
-    conformers  : FolderData  — pre-generated conformers (omit if ``smiles`` provided)
-    protocol    : Dict        — full protocol dict
-    code        : AbstractCode — QC code (e.g. orca@remote)
-    options     : Dict        — scheduler resources (optional)
-
     Outputs
     -------
-    relaxed_structure  : StructureData — lowest-energy DFT-relaxed geometry
-    output_parameters  : Dict          — ORCA output (includes atomcharges['resp'])
-    charge_report      : Dict          — provenance metadata
+    results.<solvent_key>.relaxed_structure  : StructureData
+    results.<solvent_key>.output_parameters  : Dict  (includes atomcharges)
+    results.<solvent_key>.charge_report      : Dict
     """
 
     @classmethod
@@ -65,9 +62,8 @@ class MoleculeChargeDistributionWorkChain(WorkChain):
             cls.results,
         )
 
-        spec.output('relaxed_structure',  valid_type=orm.StructureData)
-        spec.output('output_parameters',  valid_type=orm.Dict)
-        spec.output('charge_report',      valid_type=orm.Dict)
+        spec.output_namespace('results', dynamic=True)
+        # Populated as results.<solvent_key>.relaxed_structure / output_parameters / charge_report
 
         spec.exit_code(400, 'ERROR_UNSUPPORTED_CONFORMER_ENGINE',
                        message='Unsupported conformer generation engine.')
@@ -79,6 +75,10 @@ class MoleculeChargeDistributionWorkChain(WorkChain):
                        message='Pre-optimisation WorkChain failed.')
         spec.exit_code(404, 'ERROR_OPT_FAILED',
                        message='Geometry optimisation WorkChain failed.')
+        spec.exit_code(405, 'ERROR_PREOPT_FAILED_ALL_SOLVENTS',
+                       message='Pre-optimisation failed for all solvents.')
+        spec.exit_code(406, 'ERROR_OPT_FAILED_ALL_SOLVENTS',
+                       message='Geometry optimisation failed for all solvents.')
 
     # -------------------------------------------------------------------------
 
@@ -109,11 +109,18 @@ class MoleculeChargeDistributionWorkChain(WorkChain):
             return self.exit_codes.ERROR_UNSUPPORTED_ENGINE
 
         self.ctx.run_preopt = tracy_conf.get('run_preopt', True)
+
+        # solvents: list[str | None] — None means vacuum
+        raw_solvents = tracy_conf.get('solvents', [None])
+        self.ctx.solvents = raw_solvents
+        self.ctx.solvent_keys = [_solvent_key(s) for s in raw_solvents]
+
+        # opt_structures: {solvent_key: {conformer_key: StructureData}}
         self.ctx.opt_structures = {}
 
         self.report(
             f"Setup: conformer_engine={conformer_engine}, engine={engine}, "
-            f"run_preopt={self.ctx.run_preopt}"
+            f"run_preopt={self.ctx.run_preopt}, solvents={self.ctx.solvent_keys}"
         )
 
     def should_generate_conformers(self) -> bool:
@@ -140,54 +147,64 @@ class MoleculeChargeDistributionWorkChain(WorkChain):
         p = self.ctx.protocol.get('tracy', {})
         orca_conf = self.ctx.protocol.get('orca', {}).get('preopt', {})
 
-        preopt_dict: dict = {
+        preopt_base: dict = {
             'charge': p.get('charge', 0),
             'multiplicity': p.get('multiplicity', 1),
             'method': orca_conf.get('method', 'XTB2'),
             'top_k': p.get('preopt_top_k', 5),
         }
         if 'input_blocks' in orca_conf:
-            preopt_dict['input_blocks'] = orca_conf['input_blocks']
-        preopt_params = orm.Dict(preopt_dict)
+            preopt_base['input_blocks'] = orca_conf['input_blocks']
 
-        inputs = {
-            'conformers': conformers,
-            'orca_code': self.inputs.code,
-            'parameters': preopt_params,
-        }
-        if 'options' in self.inputs:
-            inputs['options'] = self.inputs.options
+        calcs = {}
+        for raw_s, key in zip(self.ctx.solvents, self.ctx.solvent_keys):
+            params = orm.Dict({**preopt_base, 'solvent': raw_s})
+            inputs = {
+                'conformers': conformers,
+                'orca_code': self.inputs.code,
+                'parameters': params,
+            }
+            if 'options' in self.inputs:
+                inputs['options'] = self.inputs.options
+            wc = self.submit(self.ctx.preopt_wc_cls, **inputs)
+            self.report(f"Submitted {self.ctx.preopt_wc_cls.__name__} solvent={key} (pk={wc.pk})")
+            calcs[f'preopt_wc_{key}'] = wc
 
-        wc = self.submit(self.ctx.preopt_wc_cls, **inputs)
-        self.report(f"Submitted {self.ctx.preopt_wc_cls.__name__} (pk={wc.pk})")
-        return ToContext(preopt_wc=wc)
+        return ToContext(**calcs)
 
     def inspect_preopt(self) -> ExitCode | None:
-        wc = self.ctx.preopt_wc
-        if not wc.is_finished_ok:
-            self.report(f"Pre-opt failed (exit {wc.exit_status}).")
-            return self.exit_codes.ERROR_PREOPT_FAILED
-        self.ctx.opt_structures = dict(wc.outputs.relaxed_structures)
-        self.report(f"Pre-opt OK: {len(self.ctx.opt_structures)} structures for DFT opt.")
+        any_ok = False
+        for key in self.ctx.solvent_keys:
+            wc = self.ctx[f'preopt_wc_{key}']
+            if not wc.is_finished_ok:
+                self.report(f"Pre-opt solvent={key} failed (exit {wc.exit_status}), skipping.")
+                continue
+            self.ctx.opt_structures[key] = dict(wc.outputs.relaxed_structures)
+            self.report(f"Pre-opt solvent={key} OK: {len(self.ctx.opt_structures[key])} structures.")
+            any_ok = True
+
+        if not any_ok:
+            return self.exit_codes.ERROR_PREOPT_FAILED_ALL_SOLVENTS
 
     def prepare_opt_inputs(self):
-        """Populate ctx.opt_structures when preopt was skipped."""
-        if self.ctx.opt_structures:
-            return
+        """Populate ctx.opt_structures for solvents where preopt was skipped or not run."""
         conformers = (
             self.ctx.conformers if 'conformers' in self.ctx
             else self.inputs.conformers
         )
-        self.ctx.opt_structures = _xyz_folder_to_structures(conformers)
-        self.report(
-            f"Prepared {len(self.ctx.opt_structures)} structures directly from conformers."
-        )
+        for key in self.ctx.solvent_keys:
+            if key not in self.ctx.opt_structures:
+                self.ctx.opt_structures[key] = _xyz_folder_to_structures(conformers)
+                self.report(
+                    f"Prepared {len(self.ctx.opt_structures[key])} structures "
+                    f"from conformers for solvent={key}."
+                )
 
     def run_opt(self):
         p = self.ctx.protocol.get('tracy', {})
         orca_conf = self.ctx.protocol.get('orca', {}).get('opt', {})
 
-        opt_dict: dict = {
+        opt_base: dict = {
             'charge': p.get('charge', 0),
             'multiplicity': p.get('multiplicity', 1),
             'method': orca_conf.get('method', 'B3LYP'),
@@ -196,43 +213,67 @@ class MoleculeChargeDistributionWorkChain(WorkChain):
             'resp_keyword': orca_conf.get('resp_keyword', 'CHELPG'),
         }
         if 'charges_key' in orca_conf:
-            opt_dict['charges_key'] = orca_conf['charges_key']
+            opt_base['charges_key'] = orca_conf['charges_key']
         if 'input_blocks' in orca_conf:
-            opt_dict['input_blocks'] = orca_conf['input_blocks']
-        opt_params = orm.Dict(opt_dict)
+            opt_base['input_blocks'] = orca_conf['input_blocks']
 
-        inputs = {
-            'structures': self.ctx.opt_structures,
-            'orca_code': self.inputs.code,
-            'parameters': opt_params,
-        }
-        if 'options' in self.inputs:
-            inputs['options'] = self.inputs.options
+        calcs = {}
+        for raw_s, key in zip(self.ctx.solvents, self.ctx.solvent_keys):
+            if key not in self.ctx.opt_structures:
+                self.report(f"No opt structures for solvent={key}, skipping.")
+                continue
+            params = orm.Dict({**opt_base, 'solvent': raw_s})
+            inputs = {
+                'structures': self.ctx.opt_structures[key],
+                'orca_code': self.inputs.code,
+                'parameters': params,
+            }
+            if 'options' in self.inputs:
+                inputs['options'] = self.inputs.options
+            wc = self.submit(self.ctx.opt_wc_cls, **inputs)
+            self.report(f"Submitted {self.ctx.opt_wc_cls.__name__} solvent={key} (pk={wc.pk})")
+            calcs[f'opt_wc_{key}'] = wc
 
-        wc = self.submit(self.ctx.opt_wc_cls, **inputs)
-        self.report(f"Submitted {self.ctx.opt_wc_cls.__name__} (pk={wc.pk})")
-        return ToContext(opt_wc=wc)
+        return ToContext(**calcs)
 
     def inspect_opt(self) -> ExitCode | None:
-        wc = self.ctx.opt_wc
-        if not wc.is_finished_ok:
-            self.report(f"Opt failed (exit {wc.exit_status}).")
-            return self.exit_codes.ERROR_OPT_FAILED
-        self.report("Opt+RESP OK.")
+        any_ok = False
+        for key in self.ctx.solvent_keys:
+            ctx_key = f'opt_wc_{key}'
+            if ctx_key not in self.ctx:
+                continue
+            wc = self.ctx[ctx_key]
+            if not wc.is_finished_ok:
+                self.report(f"Opt solvent={key} failed (exit {wc.exit_status}).")
+                continue
+            any_ok = True
+            self.report(f"Opt solvent={key} OK.")
+
+        if not any_ok:
+            return self.exit_codes.ERROR_OPT_FAILED_ALL_SOLVENTS
 
     def results(self):
-        wc = self.ctx.opt_wc
-        self.out('relaxed_structure', wc.outputs.relaxed_structure)
-        self.out('output_parameters', wc.outputs.output_parameters)
+        for key in self.ctx.solvent_keys:
+            ctx_key = f'opt_wc_{key}'
+            if ctx_key not in self.ctx:
+                continue
+            wc = self.ctx[ctx_key]
+            if not wc.is_finished_ok:
+                continue
 
-        opt_report = wc.outputs.opt_report.get_dict()
-        preopt_pk = getattr(self.ctx.get('preopt_wc', None), 'pk', None)
-        self.out('charge_report', orm.Dict({
-            'preopt_pk': preopt_pk,
-            'opt_pk': wc.pk,
-            'best_key': opt_report.get('best_key'),
-            'best_energy': opt_report.get('best_energy'),
-        }).store())
+            self.out(f'results.{key}.relaxed_structure', wc.outputs.relaxed_structure)
+            self.out(f'results.{key}.output_parameters', wc.outputs.output_parameters)
+
+            opt_report = wc.outputs.opt_report.get_dict()
+            preopt_wc = self.ctx.get(f'preopt_wc_{key}')
+            preopt_pk = preopt_wc.pk if preopt_wc is not None else None
+            self.out(f'results.{key}.charge_report', orm.Dict({
+                'solvent': key,
+                'preopt_pk': preopt_pk,
+                'opt_pk': wc.pk,
+                'best_key': opt_report.get('best_key'),
+                'best_energy': opt_report.get('best_energy'),
+            }).store())
 
 
 def _xyz_folder_to_structures(folder: orm.FolderData) -> dict[str, orm.StructureData]:

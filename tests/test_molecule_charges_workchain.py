@@ -6,7 +6,24 @@ import pytest
 from aiida import orm
 from aiida.engine import WorkChain
 
-from tracy.workflows.molecule_charges import MoleculeChargeDistributionWorkChain
+from tracy.workflows.molecule_charges import MoleculeChargeDistributionWorkChain, _solvent_key
+
+
+# ---------------------------------------------------------------------------
+# _solvent_key helper
+# ---------------------------------------------------------------------------
+
+
+def test_solvent_key_none_returns_vacuum():
+    assert _solvent_key(None) == 'vacuum'
+
+
+def test_solvent_key_water():
+    assert _solvent_key('Water') == 'water'
+
+
+def test_solvent_key_lowercase_passthrough():
+    assert _solvent_key('DMSO') == 'dmso'
 
 
 def test_is_workchain_subclass():
@@ -49,19 +66,13 @@ def test_options_is_optional():
 # ---------------------------------------------------------------------------
 
 
-def test_has_relaxed_structure_output():
-    port = MoleculeChargeDistributionWorkChain.spec().outputs['relaxed_structure']
-    assert issubclass(port.valid_type, orm.StructureData)
+def test_has_results_namespace():
+    assert 'results' in MoleculeChargeDistributionWorkChain.spec().outputs
 
 
-def test_has_output_parameters():
-    port = MoleculeChargeDistributionWorkChain.spec().outputs['output_parameters']
-    assert issubclass(port.valid_type, orm.Dict)
-
-
-def test_has_charge_report_output():
-    port = MoleculeChargeDistributionWorkChain.spec().outputs['charge_report']
-    assert issubclass(port.valid_type, orm.Dict)
+def test_results_namespace_is_dynamic():
+    port = MoleculeChargeDistributionWorkChain.spec().outputs['results']
+    assert port.dynamic is True
 
 
 # ---------------------------------------------------------------------------
@@ -97,3 +108,15 @@ def test_exit_code_opt_failed():
     codes = MoleculeChargeDistributionWorkChain.spec().exit_codes
     assert hasattr(codes, 'ERROR_OPT_FAILED')
     assert codes.ERROR_OPT_FAILED.status == 404
+
+
+def test_exit_code_preopt_failed_all_solvents():
+    codes = MoleculeChargeDistributionWorkChain.spec().exit_codes
+    assert hasattr(codes, 'ERROR_PREOPT_FAILED_ALL_SOLVENTS')
+    assert codes.ERROR_PREOPT_FAILED_ALL_SOLVENTS.status == 405
+
+
+def test_exit_code_opt_failed_all_solvents():
+    codes = MoleculeChargeDistributionWorkChain.spec().exit_codes
+    assert hasattr(codes, 'ERROR_OPT_FAILED_ALL_SOLVENTS')
+    assert codes.ERROR_OPT_FAILED_ALL_SOLVENTS.status == 406

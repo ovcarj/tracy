@@ -57,22 +57,29 @@ class OrcaOptWorkChain(WorkChain):
         basis        = p.get('basis', 'def2-SVP')
         dispersion   = p.get('dispersion', 'D3BJ')
         resp_keyword = p.get('resp_keyword', 'CHELPG')
+        solvent      = p.get('solvent')  # None = vacuum
         # charges_key is explicit when keyword + block settings produce a different
         # atomcharges key (e.g. CHELPG + RestrictedFit True → atomcharges['resp'])
         self.ctx.charges_key = p.get('charges_key', resp_keyword.lower())
+        self.ctx.solvent = solvent
 
+        keywords = [method, basis, dispersion, 'OPT', resp_keyword]
+        if solvent:
+            keywords.append(f'CPCM({solvent})')
         orca_dict: dict = {
             'charge': p.get('charge', 0),
             'multiplicity': p.get('multiplicity', 1),
-            'input_keywords': [method, basis, dispersion, 'OPT', resp_keyword],
+            'input_keywords': keywords,
         }
         if 'input_blocks' in p:
             orca_dict['input_blocks'] = p['input_blocks']
         self.ctx.orca_params = orm.Dict(orca_dict)
         self.ctx.orca_params.store()
+        solvent_label = solvent or 'vacuum'
         self.report(
             f"Setup: {len(self.inputs.structures)} structures, "
-            f"method={method}/{basis}, charges keyword={resp_keyword} (key='{self.ctx.charges_key}')"
+            f"method={method}/{basis}, charges keyword={resp_keyword} "
+            f"(key='{self.ctx.charges_key}'), solvent={solvent_label}"
         )
 
     def run_opt(self):
@@ -146,4 +153,5 @@ class OrcaOptWorkChain(WorkChain):
             'best_key': self.ctx.best['key'],
             'best_energy': self.ctx.best['energy'],
             'charges_key': self.ctx.charges_key,
+            'solvent': self.ctx.solvent,
         }).store())

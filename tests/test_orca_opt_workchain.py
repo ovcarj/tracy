@@ -9,6 +9,37 @@ from aiida.engine import WorkChain
 from tracy.workflows.orca_opt import OrcaOptWorkChain
 
 
+# ---------------------------------------------------------------------------
+# Solvent keyword logic (pure-Python, no AiiDA profile needed)
+# ---------------------------------------------------------------------------
+
+
+def _build_opt_keywords(
+    method: str, basis: str, dispersion: str, resp_keyword: str, solvent: str | None
+) -> list[str]:
+    """Mirror the keyword-building logic from OrcaOptWorkChain.setup()."""
+    keywords = [method, basis, dispersion, 'OPT', resp_keyword]
+    if solvent:
+        keywords.append(f'CPCM({solvent})')
+    return keywords
+
+
+def test_vacuum_opt_keywords():
+    kw = _build_opt_keywords('B3LYP', 'def2-SVP', 'D3BJ', 'RESP', None)
+    assert kw == ['B3LYP', 'def2-SVP', 'D3BJ', 'OPT', 'RESP']
+    assert not any('CPCM' in k for k in kw)
+
+
+def test_water_opt_adds_cpcm():
+    kw = _build_opt_keywords('B3LYP', 'def2-SVP', 'D3BJ', 'RESP', 'Water')
+    assert 'CPCM(Water)' in kw
+
+
+def test_arbitrary_solvent_opt():
+    kw = _build_opt_keywords('B3LYP', 'def2-SVP', 'D3BJ', 'RESP', 'DMSO')
+    assert 'CPCM(DMSO)' in kw
+
+
 def test_is_workchain_subclass():
     assert issubclass(OrcaOptWorkChain, WorkChain)
 

@@ -59,15 +59,20 @@ class OrcaPreoptWorkChain(WorkChain):
 
         p = self.inputs.parameters.get_dict()
         self.ctx.top_k = p.get('top_k', 5)
+        solvent = p.get('solvent')  # None = vacuum
+        keywords = [p.get('method', 'XTB2'), 'OPT']
+        if solvent:
+            keywords.append(f'ALPB({solvent})')
         orca_dict: dict = {
             'charge': p.get('charge', 0),
             'multiplicity': p.get('multiplicity', 1),
-            'input_keywords': [p.get('method', 'XTB2'), 'OPT'],
+            'input_keywords': keywords,
         }
         if 'input_blocks' in p:
             orca_dict['input_blocks'] = p['input_blocks']
         self.ctx.orca_params = orm.Dict(orca_dict)
         self.ctx.orca_params.store()
+        self.ctx.solvent = solvent
 
         self.ctx.structures = {}
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -78,7 +83,8 @@ class OrcaPreoptWorkChain(WorkChain):
                 structure.store()
                 self.ctx.structures[key] = structure
 
-        self.report(f"Setup: {len(self.ctx.structures)} conformers, top_k={self.ctx.top_k}")
+        solvent_label = solvent or 'vacuum'
+        self.report(f"Setup: {len(self.ctx.structures)} conformers, top_k={self.ctx.top_k}, solvent={solvent_label}")
 
     def run_preopt(self):
         options = self.inputs.options.get_dict() if 'options' in self.inputs else {}
@@ -143,6 +149,7 @@ class OrcaPreoptWorkChain(WorkChain):
             ]),
             'top_k': self.ctx.top_k,
             'top_k_keys': [r['key'] for r in self.ctx.top_results],
+            'solvent': self.ctx.solvent,
         }).store())
 
 
