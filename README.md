@@ -693,6 +693,34 @@ one `OrcaBaseWorkChain` per structure, and returns the lowest-energy converged r
 
 ---
 
+---
+
+## Companion packages
+
+### remolecule
+
+Per-molecule RESP charge database storing vacuum and implicit-solvent DFT charge
+distributions computed by the tracy pipeline.
+
+`remolecule` stores the output of `MoleculeChargeDistributionWorkChain` as
+structured records on disk — one record per run, with per-solvent geometries,
+RESP/Mulliken/Löwdin charges, and full conformer ensembles.
+
+```bash
+pip install "git+https://github.com/ovcarj/remolecule#egg=remolecule[aiida]"
+remolecule init
+remolecule import aiida --pk <MoleculeChargeDistributionWorkChain_pk>
+remolecule list
+remolecule show <uuid>
+```
+
+### remembrane
+
+Electrostatic potential database for membrane simulations. Stores the output of
+`ComputeMembranePotentialWorkChain`.
+
+---
+
 ## Testing
 
 ```bash
