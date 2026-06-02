@@ -6,15 +6,16 @@ from scipy.interpolate import CubicSpline
 from aiida import orm
 from aiida.engine import calcfunction
 
-# Atomic masses (g/mol) for common drug-like elements
+# Atomic masses (g/mol) — IUPAC 2021 standard atomic weights
 _ATOMIC_MASSES: dict[int, float] = {
-    1: 1.008, 5: 10.81, 6: 12.011, 7: 14.007, 8: 15.999,
-    9: 18.998, 14: 28.085, 15: 30.974, 16: 32.06, 17: 35.45,
-    35: 79.904, 53: 126.90,
+    1: 1.008,    5: 10.81,   6: 12.011,  7: 14.007,  8: 15.999,
+    9: 18.998,  11: 22.990, 12: 24.305, 14: 28.085,  15: 30.974,
+    16: 32.06,  17: 35.45,  19: 39.098, 20: 40.078,  25: 54.938,
+    26: 55.845, 29: 63.546, 30: 65.38,  35: 79.904,  53: 126.90,
 }
 
-_EV_TO_KJMOL = 96.485     # 1 eV = 96.485 kJ/mol
-_ENM_TO_DEBYE = 48.0320   # 1 e·nm = 48.0320 Debye
+_EV_TO_KJMOL = 96.48533695   # CODATA 2018: 1 eV = 96.48533695 kJ/mol
+_ENM_TO_DEBYE = 48.03206     # 1 e·nm = 48.03206 Debye
 
 
 def parse_xvg_potential(content: str) -> tuple[np.ndarray, np.ndarray]:
@@ -37,7 +38,13 @@ def build_spline(z_nm: np.ndarray, phi_V: np.ndarray) -> CubicSpline:
 
 def center_at_com(coords_nm: np.ndarray, atomnos: np.ndarray) -> np.ndarray:
     """Translate coordinates so the mass-weighted center of mass is at the origin."""
-    masses = np.array([_ATOMIC_MASSES.get(int(n), 12.0) for n in atomnos])
+    unknown = {int(n) for n in atomnos} - _ATOMIC_MASSES.keys()
+    if unknown:
+        raise ValueError(
+            f"Unknown atomic numbers {sorted(unknown)}. "
+            f"Expand _ATOMIC_MASSES in tracy/calculations/electrostatic_energy.py."
+        )
+    masses = np.array([_ATOMIC_MASSES[int(n)] for n in atomnos])
     com = np.average(coords_nm, axis=0, weights=masses)
     return coords_nm - com
 
@@ -131,7 +138,15 @@ def compute_electrostatic_energy(
     # aiida-orca (via cclib) stores atomcoords in Angstroms; convert to nm
     atomcoords_A = np.array(params['atomcoords'][-1])
     coords_nm = center_at_com(atomcoords_A / 10.0, atomnos)
-    charges = np.array(params['atomcharges'][charges_model])
+    atomcharges = params.get('atomcharges', {})
+    if charges_model not in atomcharges:
+        available = list(atomcharges.keys())
+        raise ValueError(
+            f"Charge model '{charges_model}' not found in output_parameters "
+            f"(available: {available}). "
+            f"Check protocol.tracy.charges_model matches the ORCA keyword used."
+        )
+    charges = np.array(atomcharges[charges_model])
 
     dipole = compute_dipole(coords_nm, charges)
     dipole_norm = float(np.linalg.norm(dipole))
@@ -158,6 +173,12 @@ def compute_electrostatic_energy(
         if z_clip_max is not None:
             z_end = min(z_end, float(z_clip_max))
 
+        if z_start >= z_end:
+            raise ValueError(
+                f"Invalid scan range for '{sign_label}' orientation after applying clip bounds: "
+                f"z_start={z_start:.4f} nm >= z_end={z_end:.4f} nm. "
+                f"Check protocol.tracy.z_scan_nm.min/max and molecule size vs profile range."
+            )
         z_scan = np.linspace(z_start, z_end, n_points)
         energies_eV = scan_electrostatic_energy(z_scan, oriented, charges, spline, axis)
         energies_kJmol = energies_eV * _EV_TO_KJMOL

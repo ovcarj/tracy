@@ -61,8 +61,9 @@ class RunMembraneMDWorkChain(WorkChain):
     ``setup`` — this WorkChain does not change.
 
     Steps are driven by ``protocol.tracy.md_steps``, which filters the
-    CHARMM-GUI manifest.  The output structure and checkpoint of each completed
-    step are passed automatically to the next.
+    CHARMM-GUI manifest.  The output structure of each completed step is passed
+    automatically to the next (checkpoints are intentionally not forwarded —
+    see CLAUDE.md §6.9).
 
     Inputs
     ------

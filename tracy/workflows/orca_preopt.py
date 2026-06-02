@@ -71,6 +71,7 @@ class OrcaPreoptWorkChain(WorkChain):
         self.ctx.orca_params = orm.Dict(orca_dict)
         self.ctx.orca_params.store()
         self.ctx.solvent = solvent
+        self.ctx.solvent_label = solvent or 'vacuum'
 
         self.ctx.structures = {}
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -111,7 +112,7 @@ class OrcaPreoptWorkChain(WorkChain):
                 self.report(f"{key}: XTB failed (exit {wc.exit_status}), skipping.")
                 continue
             params = wc.outputs.output_parameters.get_dict()
-            energies = params.get('scfenergies', [])
+            energies = params.get('scfenergies') or params.get('totalenergies') or []
             if not energies or not params.get('optdone', False):
                 self.report(f"{key}: optimization did not converge, skipping.")
                 continue
@@ -148,7 +149,7 @@ class OrcaPreoptWorkChain(WorkChain):
             ]),
             'top_k': self.ctx.top_k,
             'top_k_keys': [r['key'] for r in self.ctx.top_results],
-            'solvent': self.ctx.solvent,
+            'solvent': self.ctx.solvent_label,
         }).store())
 
 

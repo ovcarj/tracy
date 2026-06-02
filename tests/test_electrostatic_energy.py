@@ -104,11 +104,19 @@ def test_center_at_com_preserves_relative_positions():
     np.testing.assert_allclose(diffs_before, diffs_after, atol=1e-12)
 
 
-def test_center_at_com_unknown_element_uses_carbon_mass():
+def test_center_at_com_unknown_element_raises():
     coords = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
-    atomnos = np.array([0, 0])  # element 0 not in lookup → defaults to 12.0
+    atomnos = np.array([0, 0])  # element 0 not in lookup
+    with pytest.raises(ValueError, match="Unknown atomic numbers"):
+        center_at_com(coords, atomnos)
+
+
+def test_center_at_com_metal_element_ok():
+    # Zn (30), Na (11), Ca (20) must work without error
+    coords = np.array([[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]])
+    atomnos = np.array([30, 11])  # Zn + Na
     centered = center_at_com(coords, atomnos)
-    np.testing.assert_allclose(centered[0], [-0.5, 0.0, 0.0], atol=1e-12)
+    assert centered.shape == (2, 3)
 
 
 # ---------------------------------------------------------------------------
@@ -260,6 +268,69 @@ def test_scan_length_matches_n_points():
     z_scan = np.linspace(0.5, 4.5, 37)
     energies = scan_electrostatic_energy(z_scan, coords, charges, spline, axis=2)
     assert len(energies) == 37
+
+
+# ---------------------------------------------------------------------------
+# compute_electrostatic_energy — error handling
+# ---------------------------------------------------------------------------
+
+
+def _make_output_parameters(charges_key: str = 'resp') -> dict:
+    """Minimal output_parameters dict for testing."""
+    return {
+        'atomnos': [6, 8],
+        'atomcoords': [[[0.0, 0.0, -0.6], [0.0, 0.0, 0.6]]],
+        'atomcharges': {charges_key: [0.5, -0.5]},
+    }
+
+
+def _make_protocol(charges_model: str = 'resp', z_min=None, z_max=None) -> dict:
+    z_scan: dict = {'n_points': 50}
+    if z_min is not None:
+        z_scan['min'] = z_min
+    if z_max is not None:
+        z_scan['max'] = z_max
+    return {'tracy': {'membrane_normal_axis': 'z', 'charges_model': charges_model,
+                      'z_scan_nm': z_scan}}
+
+
+def _make_xvg_node(z_min=0.0, z_max=8.0, n=50):
+    import io
+    from aiida import orm
+    lines = [f"{z:.4f}  {z:.4f}" for z in np.linspace(z_min, z_max, n)]
+    xvg = orm.SinglefileData(io.BytesIO("\n".join(lines).encode()), filename="potential.xvg")
+    xvg.store()
+    return xvg
+
+
+def test_missing_charge_model_raises_informative_error(aiida_profile):
+    from aiida import orm
+    from tracy.calculations.electrostatic_energy import compute_electrostatic_energy
+
+    xvg = _make_xvg_node()
+    params = orm.Dict(_make_output_parameters(charges_key='resp'))
+    params.store()
+    protocol = orm.Dict(_make_protocol(charges_model='chelpg'))
+    protocol.store()
+
+    with pytest.raises(ValueError, match="chelpg") as exc:
+        compute_electrostatic_energy(xvg, params, protocol)
+    assert "available" in str(exc.value)
+
+
+def test_reversed_scan_bounds_raises(aiida_profile):
+    from aiida import orm
+    from tracy.calculations.electrostatic_energy import compute_electrostatic_energy
+
+    xvg = _make_xvg_node()
+    params = orm.Dict(_make_output_parameters())
+    params.store()
+    # min > max → z_start >= z_end after clipping
+    protocol = orm.Dict(_make_protocol(z_min=6.0, z_max=2.0))
+    protocol.store()
+
+    with pytest.raises(ValueError, match="Invalid scan range"):
+        compute_electrostatic_energy(xvg, params, protocol)
 
 
 # ---------------------------------------------------------------------------

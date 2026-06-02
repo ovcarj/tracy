@@ -131,6 +131,20 @@ class MoleculeChargeDistributionWorkChain(WorkChain):
 
     def run_conformer_gen(self):
         p = self.ctx.protocol.get('tracy', {})
+        mol_charge = p.get('charge', 0)
+        try:
+            from rdkit import Chem
+            mol = Chem.MolFromSmiles(self.inputs.smiles.value)
+            if mol is not None:
+                rdkit_charge = Chem.GetFormalCharge(mol)
+                if rdkit_charge != mol_charge:
+                    self.report(
+                        f"WARNING: SMILES formal charge ({rdkit_charge}) does not match "
+                        f"protocol.tracy.charge ({mol_charge}). "
+                        f"ORCA will use charge={mol_charge}. Verify this is intentional."
+                    )
+        except ImportError:
+            pass
         conformers = self.ctx.conformer_fn(
             smiles=self.inputs.smiles,
             n_conformers=orm.Int(p.get('n_conformers', 20)),
@@ -210,7 +224,7 @@ class MoleculeChargeDistributionWorkChain(WorkChain):
             'method': orca_conf.get('method', 'B3LYP'),
             'basis': orca_conf.get('basis', 'def2-SVP'),
             'dispersion': orca_conf.get('dispersion', 'D3BJ'),
-            'resp_keyword': orca_conf.get('resp_keyword', 'CHELPG'),
+            'resp_keyword': orca_conf.get('resp_keyword', 'RESP'),
         }
         if 'charges_key' in orca_conf:
             opt_base['charges_key'] = orca_conf['charges_key']

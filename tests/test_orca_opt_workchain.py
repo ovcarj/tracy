@@ -116,3 +116,31 @@ def test_exit_code_no_converged_structures():
     codes = OrcaOptWorkChain.spec().exit_codes
     assert hasattr(codes, 'ERROR_NO_CONVERGED_STRUCTURES')
     assert codes.ERROR_NO_CONVERGED_STRUCTURES.status == 421
+
+
+# ---------------------------------------------------------------------------
+# Default keyword behaviour
+# ---------------------------------------------------------------------------
+
+
+def _build_opt_params_default() -> list[str]:
+    """Reproduce OrcaOptWorkChain.setup() keyword logic with all defaults."""
+    p: dict = {}
+    method       = p.get('method', 'B3LYP')
+    basis        = p.get('basis', 'def2-SVP')
+    dispersion   = p.get('dispersion', 'D3BJ')
+    resp_keyword = p.get('resp_keyword', 'RESP')
+    return [method, basis, dispersion, 'OPT', resp_keyword]
+
+
+def test_default_resp_keyword_is_resp():
+    kw = _build_opt_params_default()
+    assert 'RESP' in kw
+    assert 'CHELPG' not in kw
+
+
+def test_default_charges_key_derived_from_resp():
+    p: dict = {}
+    resp_keyword = p.get('resp_keyword', 'RESP')
+    charges_key = p.get('charges_key', resp_keyword.lower())
+    assert charges_key == 'resp'

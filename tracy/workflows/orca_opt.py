@@ -54,7 +54,7 @@ class OrcaOptWorkChain(WorkChain):
         method       = p.get('method', 'B3LYP')
         basis        = p.get('basis', 'def2-SVP')
         dispersion   = p.get('dispersion', 'D3BJ')
-        resp_keyword = p.get('resp_keyword', 'CHELPG')
+        resp_keyword = p.get('resp_keyword', 'RESP')
         solvent      = p.get('solvent')  # None = vacuum
         # charges_key is explicit when keyword + block settings produce a different
         # atomcharges key (e.g. CHELPG + RestrictedFit True → atomcharges['resp'])
@@ -120,7 +120,7 @@ class OrcaOptWorkChain(WorkChain):
             if not hasattr(wc.outputs, 'relaxed_structure'):
                 self.report(f"{key}: no relaxed_structure output, skipping.")
                 continue
-            energies = params.get('scfenergies', [])
+            energies = params.get('scfenergies') or params.get('totalenergies') or []
             results.append({
                 'key': key,
                 'energy': float(energies[-1]),
