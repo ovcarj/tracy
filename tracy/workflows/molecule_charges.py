@@ -195,6 +195,8 @@ class MoleculeChargeDistributionWorkChain(WorkChain):
             'dispersion': orca_conf.get('dispersion', 'D3BJ'),
             'resp_keyword': orca_conf.get('resp_keyword', 'CHELPG'),
         }
+        if 'charges_key' in orca_conf:
+            opt_dict['charges_key'] = orca_conf['charges_key']
         if 'input_blocks' in orca_conf:
             opt_dict['input_blocks'] = orca_conf['input_blocks']
         opt_params = orm.Dict(opt_dict)

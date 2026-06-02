@@ -57,8 +57,9 @@ class OrcaOptWorkChain(WorkChain):
         basis        = p.get('basis', 'def2-SVP')
         dispersion   = p.get('dispersion', 'D3BJ')
         resp_keyword = p.get('resp_keyword', 'CHELPG')
-        # atomcharges key in output_parameters matches the lowercase keyword
-        self.ctx.charges_key = resp_keyword.lower()
+        # charges_key is explicit when keyword + block settings produce a different
+        # atomcharges key (e.g. CHELPG + RestrictedFit True → atomcharges['resp'])
+        self.ctx.charges_key = p.get('charges_key', resp_keyword.lower())
 
         orca_dict: dict = {
             'charge': p.get('charge', 0),
