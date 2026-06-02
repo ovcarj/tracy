@@ -135,9 +135,9 @@ new lipids are added regularly.
 | `DPPC` | 16:0 / 16:0 | gel phase at 298 K [[1]](https://doi.org/10.1021/jp101759q) |
 | `POPC` | 16:0 / 18:1 | most common model PC [[1]](https://doi.org/10.1021/jp101759q) |
 | `DOPC` | 18:1 / 18:1 | |
-| `PLPC` | 16:0 / 18:2 n-6 | enriched in mammalian IMM [[2]](https://doi.org/10.1016/0005-2736(90)90036-n)[[3]](https://doi.org/10.1016/0005-2736(76)90353-9) |
+| `PLPC` | 16:0 / 18:2 n-6 | representative linoleoyl PC for mammalian mitochondrial models [[2]](https://doi.org/10.1016/0005-2736(90)90036-n)[[3]](https://doi.org/10.1016/0005-2736(76)90353-9) |
 | `PAPC` | 16:0 / 20:4 n-6 | arachidonoyl |
-| `SAPC` | 18:0 / 20:4 n-6 | abundant in mammalian IMM [[2]](https://doi.org/10.1016/0005-2736(90)90036-n)[[3]](https://doi.org/10.1016/0005-2736(76)90353-9) |
+| `SAPC` | 18:0 / 20:4 n-6 | representative arachidonoyl PC for mammalian mitochondrial models [[2]](https://doi.org/10.1016/0005-2736(90)90036-n)[[3]](https://doi.org/10.1016/0005-2736(76)90353-9) |
 | `PDPC` | 16:0 / 22:6 n-3 | DHA (docosahexaenoyl) |
 | `SDPC` | 18:0 / 22:6 n-3 | DHA; enriched in brain and retinal membranes [[4]](https://doi.org/10.1038/nrm2330) |
 
@@ -148,8 +148,8 @@ new lipids are added regularly.
 | `DPPE` | 16:0 / 16:0 | |
 | `POPE` | 16:0 / 18:1 | most common model PE [[5]](https://doi.org/10.1021/jz200167q) |
 | `DOPE` | 18:1 / 18:1 | |
-| `PLPE` | 16:0 / 18:2 n-6 | enriched in mammalian IMM [[2]](https://doi.org/10.1016/0005-2736(90)90036-n) |
-| `SAPE` | 18:0 / 20:4 n-6 | enriched in mammalian IMM [[2]](https://doi.org/10.1016/0005-2736(90)90036-n) |
+| `PLPE` | 16:0 / 18:2 n-6 | representative linoleoyl PE for mammalian mitochondrial models [[2]](https://doi.org/10.1016/0005-2736(90)90036-n) |
+| `SAPE` | 18:0 / 20:4 n-6 | representative arachidonoyl PE for mammalian mitochondrial models [[2]](https://doi.org/10.1016/0005-2736(90)90036-n) |
 | `SDPE` | 18:0 / 22:6 n-3 | DHA-PE; enriched in brain and retinal membranes [[4]](https://doi.org/10.1038/nrm2330) |
 
 **Negatively charged lipids**
@@ -166,7 +166,7 @@ new lipids are added regularly.
 
 | Code | Chains | Biological context |
 |---|---|---|
-| `TLCL2` | 18:2 × 4 | dominant species in mammalian IMM [[7]](https://doi.org/10.1016/S0163-7827(00)00005-9)[[10]](https://doi.org/10.1194/jlr.m600551-jlr200) |
+| `TLCL2` | 18:2 × 4 | dominant cardiolipin species in mammalian heart mitochondria [[7]](https://doi.org/10.1016/S0163-7827(00)00005-9)[[10]](https://doi.org/10.1194/jlr.m600551-jlr200) |
 | `TOCL2` | 18:1 × 4 | dominant species in yeast IMM [[8]](https://doi.org/10.1128/jb.173.6.2026-2034.1991) |
 | `TPCL2` | 16:0 × 4 | |
 | `TMCL2` | 14:0 × 4 | bacteria [[6]](https://doi.org/10.1146/annurev.biochem.66.1.199) |
@@ -204,8 +204,8 @@ upper: "POPE:POPC:TLCL2=40:40:20"
 lower: "POPE:POPC:TLCL2=45:35:20"
 
 # Mammalian IMM — PUFA-enriched species model:
-# Mammalian mitochondrial PC and PE carry predominantly 18:2 (n-6) and 20:4 (n-6) chains [2,3].
-# SAPC, PLPC, SAPE are representative PUFA species; exact ratios are modeling choices.
+# Mammalian mitochondrial PC and PE are enriched in unsaturated chains including 18:2 and 20:4 [2,3].
+# SAPC, PLPC, SAPE are representative molecular species chosen to reflect this; ratios are modeling choices.
 upper: "POPE:SAPC:PLPC:TLCL2=35:20:15:30"
 lower: "POPE:SAPC:PLPC:TLCL2=38:18:12:32"
 
