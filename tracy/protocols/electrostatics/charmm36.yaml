@@ -60,15 +60,23 @@ tracy:
   # Create Water and ION index groups via gmx select before the analysis.
   # These are merged into the original .ndx so existing groups are preserved.
   #
-  # CHARMM36/36m KCl system (Quick Bilayer default):
+  # Residue names depend on the force field and ion type chosen at build time:
+  #
+  #   CHARMM36/36m — KCl (Quick Bilayer default):
   new_index_groups:
     - '"Water" resname TIP3'       # CHARMM36 TIP3P water
-    - '"ION" resname POT CLA'      # K+ / Cl-   (KCl system)
-  # For NaCl: replace with:
-  #   - '"ION" resname SOD CLA'    # Na+ / Cl-  (NaCl system)
-  # For AMBER: replace with:
-  #   - '"Water" resname WAT'      # or HOH
-  #   - '"ION" resname K Cl'
+    - '"ION" resname POT CLA'      # K+ = POT, Cl- = CLA
+  #
+  #   CHARMM36/36m — NaCl:
+  #     - '"ION" resname SOD CLA'  # Na+ = SOD, Cl- = CLA
+  #
+  #   AMBER:
+  #     - '"Water" resname WAT'    # or HOH
+  #     - '"ION" resname K Cl'
+  #
+  #   OPLS:
+  #     - '"Water" resname SOL'
+  #     - '"ION" resname NA CL'
   # ------------------------------------------------------------------
 
   # ------------------------------------------------------------------

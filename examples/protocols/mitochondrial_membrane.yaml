@@ -16,6 +16,9 @@ charmm_gui:
     # Custom asymmetric composition.
     # Format: "LIP1:LIP2:LIP3=ratio1:ratio2:ratio3"
     # Use membtype (e.g. membtype: PMm) instead for a preset system.
+    # See tracy/protocols/charmm_gui/mitochondrial_membrane.yaml for a
+    # full reference of CHARMM36/36m lipid residue codes and example
+    # compositions (OMM, yeast IMM, plasma membrane, etc.).
     upper: "POPE:POPC:TLCL2=40:40:20"
     lower: "POPE:POPC:TLCL2=45:35:20"
 
@@ -25,7 +28,7 @@ charmm_gui:
     wdist: 22.5       # water layer thickness per side in Å
 
     ion_conc: 0.15    # M
-    ion_type: NaCl
+    ion_type: KCl     # KCl or NaCl; CHARMM36: K+=POT/Na+=SOD, Cl-=CLA
 
     run_ff_converter: true    # produce GROMACS/AMBER/NAMD/OpenMM files
     temperature: 310.15       # K

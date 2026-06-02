@@ -116,7 +116,101 @@ tracy:
   require_gromacs_files: true
 ```
 
-An example protocol is provided at `examples/protocols/mitochondrial_membrane.yaml`.
+The full reference protocol with all configuration options and example compositions is at
+`tracy/protocols/charmm_gui/mitochondrial_membrane.yaml`.
+
+### CHARMM36/36m lipid residue codes
+
+Use these codes in the `upper` / `lower` composition strings.
+Verify names against the CHARMM-GUI Membrane Builder lipid library before submitting —
+new lipids are added regularly.
+
+**Phosphatidylcholines (PC) — neutral**
+
+| Code | Acyl chains | Notes |
+|---|---|---|
+| `DPPC` | 16:0 / 16:0 | gel phase at 298 K |
+| `POPC` | 16:0 / 18:1 | most common model PC |
+| `DOPC` | 18:1 / 18:1 | |
+| `PLPC` | 16:0 / 18:2 n-6 | common in mitochondria |
+| `PAPC` | 16:0 / 20:4 n-6 | arachidonoyl |
+| `SAPC` | 18:0 / 20:4 n-6 | abundant in mammalian IMM |
+| `PDPC` | 16:0 / 22:6 n-3 | DHA |
+| `SDPC` | 18:0 / 22:6 n-3 | common in mammalian mitochondria |
+
+**Phosphatidylethanolamines (PE) — neutral**
+
+| Code | Acyl chains | Notes |
+|---|---|---|
+| `DPPE` | 16:0 / 16:0 | |
+| `POPE` | 16:0 / 18:1 | most common model PE |
+| `DOPE` | 18:1 / 18:1 | |
+| `PLPE` | 16:0 / 18:2 n-6 | |
+| `SAPE` | 18:0 / 20:4 n-6 | |
+| `SDPE` | 18:0 / 22:6 n-3 | common in mammalian mitochondria |
+
+**Negatively charged lipids**
+
+| Code | Type | Charge | Notes |
+|---|---|---|---|
+| `POPS` | PS | −1 | preferentially inner leaflet |
+| `DOPS` | PS | −1 | |
+| `POPG` | PG | −1 | common in bacteria and chloroplasts |
+| `DOPG` | PG | −1 | |
+| `POPI` | PI | −1 | OMM, ER, plasma membrane |
+
+**Cardiolipins (CL) — use suffix `2` (−2 e) at physiological pH**
+
+| Code | Chains | Biological context |
+|---|---|---|
+| `TLCL2` | 18:2 × 4 | dominant in mammalian IMM |
+| `TOCL2` | 18:1 × 4 | dominant in yeast IMM |
+| `TPCL2` | 16:0 × 4 | |
+| `TMCL2` | 14:0 × 4 | bacteria |
+
+Use suffix `1` (−1 e) only when modelling a partially protonated cardiolipin.
+
+**Sphingomyelins (SM) — neutral**
+
+| Code | N-acyl | Notes |
+|---|---|---|
+| `PSM` | 16:0 | most common in mammalian plasma membrane |
+| `SSM` | 18:0 | |
+| `BNSM` | 22:0 | |
+
+**Sterols — neutral**
+
+| Code | Name |
+|---|---|
+| `CHL1` | Cholesterol (mammalian) |
+| `ERG` | Ergosterol (yeast/fungal) |
+
+### Common compositions
+
+```yaml
+# Mammalian inner mitochondrial membrane (simple PC/PE/CL model):
+upper: "POPE:POPC:TLCL2=40:40:20"
+lower: "POPE:POPC:TLCL2=45:35:20"
+
+# Mammalian IMM with poly-unsaturated acyl chains:
+upper: "POPE:SAPC:PLPC:TLCL2=35:20:15:30"
+lower: "POPE:SAPC:PLPC:TLCL2=38:18:12:32"
+
+# Outer mitochondrial membrane (OMM):
+upper: "POPC:POPE:POPI:POPS=50:30:10:10"
+lower: "POPC:POPE:POPI:POPS=48:32:12:8"
+
+# Yeast inner mitochondrial membrane:
+upper: "POPE:POPI:POPC:TOCL2=40:15:25:20"
+lower: "POPE:POPI:POPC:TOCL2=35:15:30:20"
+
+# Asymmetric plasma membrane (mammalian, raft-forming):
+upper: "POPC:PSM:CHL1=25:40:35"          # outer leaflet: SM + cholesterol-rich
+lower: "POPE:POPS:POPC:CHL1=45:15:15:25" # inner leaflet: PE + PS
+```
+
+> **Ion residue names (CHARMM36):** KCl → `POT` (K⁺) / `CLA` (Cl⁻); NaCl → `SOD` (Na⁺) / `CLA` (Cl⁻).
+> These names are required in the electrostatics protocol `new_index_groups` strings.
 
 ### Submitting
 

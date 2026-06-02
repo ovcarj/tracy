@@ -3,12 +3,6 @@
 # Reference protocol for a cardiolipin-containing asymmetric bilayer
 # representative of the mitochondrial inner membrane (IMM).
 #
-# The IMM is enriched in phosphatidylethanolamine (~40 mol%),
-# phosphatidylcholine (~40 mol%), and cardiolipin (~15-20 mol%), with
-# negligible cholesterol.  Lipid ratios here are illustrative; consult
-# primary literature for the composition relevant to your organism and
-# experimental context.
-#
 # All quick_bilayer parameters correspond to inputs of
 # QuickBilayerWorkChain in aiida-charmm-gui.  Parameters that map
 # directly to the CHARMM-GUI Quick Bilayer API are noted.
@@ -18,7 +12,7 @@ system:
   description: >-
     Asymmetric cardiolipin-containing bilayer representative of the
     mitochondrial inner membrane.  Built via CHARMM-GUI Quick Bilayer
-    with the CHARMM36 force field and GROMACS output.
+    with the CHARMM36m force field and GROMACS output.
 
 charmm_gui:
   module: membrane_builder
@@ -39,9 +33,112 @@ charmm_gui:
     #
     # Option B — custom asymmetric composition (API fields: upper, lower).
     # Format: "LIP1:LIP2:LIP3=ratio1:ratio2:ratio3"
-    # CHARMM36 lipid names (examples): POPE, POPC, POPS, POPI, TLCL2
-    # (cardiolipin), CHL1 (cholesterol), DPPC, DPPS, NSM (sphingomyelin).
-    # Verify names against the CHARMM-GUI lipid library before submitting.
+    # Ratios are molar percentages and must sum to 100.
+    #
+    # ------------------------------------------------------------------
+    # CHARMM36/36m lipid residue codes
+    # Verify against the CHARMM-GUI Membrane Builder lipid library
+    # (charmm-gui.org) before submitting, as new lipids are added
+    # regularly.
+    # ------------------------------------------------------------------
+    #
+    # Phosphatidylcholines (PC) — neutral
+    #   DLPC  12:0/12:0    dilauroyl-PC
+    #   DMPC  14:0/14:0    dimyristoyl-PC
+    #   DPPC  16:0/16:0    dipalmitoyl-PC (gel phase at 298 K)
+    #   DSPC  18:0/18:0    distearoyl-PC
+    #   POPC  16:0/18:1    palmitoyl-oleoyl-PC (most common model PC)
+    #   DOPC  18:1/18:1    dioleoyl-PC
+    #   PLPC  16:0/18:2    palmitoyl-linoleoyl-PC (n-6, common in mitochondria)
+    #   PAPC  16:0/20:4    palmitoyl-arachidonoyl-PC (n-6)
+    #   SAPC  18:0/20:4    stearoyl-arachidonoyl-PC (n-6, abundant in mammalian IMM)
+    #   PDPC  16:0/22:6    palmitoyl-DHA-PC (n-3)
+    #   SDPC  18:0/22:6    stearoyl-DHA-PC (n-3, common in mammalian mitochondria)
+    #
+    # Phosphatidylethanolamines (PE) — neutral
+    #   DMPE  14:0/14:0
+    #   DPPE  16:0/16:0
+    #   DSPE  18:0/18:0
+    #   POPE  16:0/18:1    palmitoyl-oleoyl-PE (most common model PE)
+    #   DOPE  18:1/18:1    dioleoyl-PE
+    #   PLPE  16:0/18:2    palmitoyl-linoleoyl-PE (n-6)
+    #   PAPE  16:0/20:4    palmitoyl-arachidonoyl-PE (n-6)
+    #   SAPE  18:0/20:4    stearoyl-arachidonoyl-PE (n-6)
+    #   SDPE  18:0/22:6    stearoyl-DHA-PE (n-3, common in mammalian mitochondria)
+    #
+    # Phosphatidylserines (PS) — negatively charged (−1 e)
+    #   DPPS  16:0/16:0
+    #   POPS  16:0/18:1    (preferentially in inner leaflet; Ca²⁺ binding)
+    #   DOPS  18:1/18:1
+    #
+    # Phosphatidylglycerols (PG) — negatively charged (−1 e)
+    #   DPPG  16:0/16:0
+    #   POPG  16:0/18:1    (abundant in bacterial and chloroplast membranes)
+    #   DOPG  18:1/18:1
+    #
+    # Phosphatidylinositols (PI) — negatively charged (−1 e)
+    #   DPPI  16:0/16:0
+    #   POPI  16:0/18:1    (outer mitochondrial membrane, ER, plasma membrane)
+    #
+    # Cardiolipins (CL) — negatively charged
+    #   Suffix "2" = fully deprotonated (−2 e); use at physiological pH.
+    #   Suffix "1" = monoprotonated (−1 e); use only if specifically modelling
+    #               the partially protonated form (rare; low pKa in membranes).
+    #
+    #   TMCL1 / TMCL2   14:0×4  tetramyristoyl-CL  (bacteria)
+    #   TPCL1 / TPCL2   16:0×4  tetrapalmitoyl-CL
+    #   TLCL1 / TLCL2   18:2×4  tetralinoleoyl-CL  ← dominant in mammalian IMM
+    #   TOCL1 / TOCL2   18:1×4  tetraoleoyl-CL     ← dominant in yeast IMM
+    #
+    # Sphingomyelins (SM) — neutral
+    #   PSM   16:0 (N-palmitoyl)    most common in mammalian plasma membrane
+    #   SSM   18:0 (N-stearoyl)
+    #   BNSM  22:0 (N-behenoyl)
+    #   LSM   24:1 (N-nervonoyl)
+    #
+    # Sterols — neutral
+    #   CHL1   cholesterol  (mammalian)
+    #   ERG    ergosterol   (yeast/fungal)
+    #
+    # ------------------------------------------------------------------
+    # Example compositions
+    # ------------------------------------------------------------------
+    #
+    # Mammalian inner mitochondrial membrane — simple PC/PE/CL model:
+    #   IMM: ~40 mol% PE, ~35 mol% PC, ~15-20 mol% CL, ~5 mol% PI
+    #   (Hovius et al. 1990; Comte et al. 1976)
+    #   upper: "POPE:POPC:TLCL2=40:40:20"
+    #   lower: "POPE:POPC:TLCL2=45:35:20"
+    #
+    # Mammalian IMM with poly-unsaturated acyl chains (more realistic):
+    #   Reflects the high content of 18:2 and 20:4 chains in mammalian CL
+    #   and the prevalence of 18:0/20:4 PC in heart and liver mitochondria.
+    #   upper: "POPE:SAPC:PLPC:TLCL2=35:20:15:30"
+    #   lower: "POPE:SAPC:PLPC:TLCL2=38:18:12:32"
+    #
+    # Mammalian outer mitochondrial membrane (OMM):
+    #   OMM: ~45-50% PC, ~25-30% PE, ~10% PI, ~5% PS, little CL
+    #   upper: "POPC:POPE:POPI:POPS=50:30:10:10"
+    #   lower: "POPC:POPE:POPI:POPS=48:32:12:8"
+    #
+    # Yeast inner mitochondrial membrane (S. cerevisiae):
+    #   Yeast CL is predominantly tetraoleoyl (18:1×4) not tetralinoleoyl.
+    #   upper: "POPE:POPI:POPC:TOCL2=40:15:25:20"
+    #   lower: "POPE:POPI:POPC:TOCL2=35:15:30:20"
+    #
+    # Mammalian plasma membrane — asymmetric raft-forming model:
+    #   Outer leaflet enriched in SM + cholesterol; inner leaflet PE-rich.
+    #   upper: "POPC:PSM:CHL1=25:40:35"
+    #   lower: "POPE:POPS:POPC:CHL1=45:15:15:25"
+    #
+    # Symmetric model bilayer (single-component, for benchmarking):
+    #   upper: "POPC=100"
+    #   lower: "POPC=100"
+    #   # Gel-phase benchmark: use DPPC instead of POPC.
+    #
+    # ------------------------------------------------------------------
+    # Active composition
+    # ------------------------------------------------------------------
     upper: "POPE:POPC:TLCL2=40:40:20"
     lower: "POPE:POPC:TLCL2=45:35:20"
 
@@ -63,7 +160,10 @@ charmm_gui:
     # Solvent and ions  (API fields: Ion_conc, Ion_type)
     # ------------------------------------------------------------------
     ion_conc: 0.15   # ion concentration in M
-    ion_type: NaCl   # NaCl or KCl
+    ion_type: KCl    # KCl or NaCl
+    # CHARMM36 residue names:
+    #   KCl  →  K+ = POT,  Cl- = CLA   (use in electrostatics protocol)
+    #   NaCl →  Na+ = SOD, Cl- = CLA
 
     # ------------------------------------------------------------------
     # Force-field converter
