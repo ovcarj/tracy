@@ -1,0 +1,74 @@
+# Tracy protocol: GROMACS membrane MD — CHARMM-GUI bundle with CHARMM36/36m
+#
+# For use with RunMembraneMDWorkChain on bundles produced by
+# BuildMembraneWorkChain (or directly from CHARMM-GUI Quick Bilayer with
+# run_ffconverter=1 / run_ff_converter: true).
+#
+# The CHARMM-GUI MDP files are used as-is except where mdp_overrides is set.
+# The step sequence follows the CHARMM-GUI Quick Bilayer naming convention:
+#
+#   step6.0_minimization.mdp     energy minimisation (steepest descent)
+#   step6.1_equilibration.mdp  \
+#   step6.2_equilibration.mdp   |
+#   step6.3_equilibration.mdp   | NpT equilibration, gradually releasing
+#   step6.4_equilibration.mdp   | positional restraints on lipid head groups
+#   step6.5_equilibration.mdp   |
+#   step6.6_equilibration.mdp  /
+#   step7_production.mdp         unrestrained NpT production
+#
+# Validated configuration (CLAUDE.md pk=1608):
+#   GROMACS 2021.7 | CHARMM36m | POPC bilayer | 64 MPI ranks
+#
+# Usage (Python):
+#   from aiida import orm
+#   import yaml
+#   protocol = orm.Dict(yaml.safe_load(open("charmm_gui_charmm36.yaml")))
+
+tracy:
+  expected_engine: gromacs
+  membrane_normal_axis: z
+
+  # ------------------------------------------------------------------
+  # MD steps
+  #
+  # Each name matches the CHARMM-GUI MDP filename convention.
+  # Repetition selects successive steps with the same name:
+  # the first "equilibration" picks step6.1, the second picks step6.2, etc.
+  #
+  # For a quick test run, reduce to [minimization] only.
+  # ------------------------------------------------------------------
+  md_steps:
+    - minimization
+    - equilibration   # step6.1 — backbone + sidechain restraints 4000/2000 kJ/mol/nm²
+    - equilibration   # step6.2 — restraints 2000/1000 kJ/mol/nm²
+    - equilibration   # step6.3 — restraints 1000/400 kJ/mol/nm²
+    - equilibration   # step6.4 — restraints 400/200 kJ/mol/nm²
+    - equilibration   # step6.5 — restraints 200/40 kJ/mol/nm²
+    - equilibration   # step6.6 — restraints 40/0 kJ/mol/nm² (fully unrestrained)
+    - production
+
+  # ------------------------------------------------------------------
+  # MDP overrides — applied per step before submission.
+  # Keys are normalised (hyphens and underscores are equivalent).
+  #
+  # MANDATORY for ComputeMembranePotentialWorkChain:
+  #   The production step must write a compressed trajectory (.xtc).
+  #   CHARMM-GUI MDPs may already set nstxout-compressed = 25000;
+  #   including it here makes the requirement explicit and auditable.
+  #
+  #   At 2 fs timestep and nstxout-compressed = 25000:
+  #     1 frame every 50 ps; 200 ns production → 4000 frames (~500 MB .xtc)
+  #   At 4 fs timestep (HMR, CHARMM-GUI charmmff_hmr_checked: true):
+  #     1 frame every 100 ps; 200 ns production → 2000 frames (~250 MB .xtc)
+  # ------------------------------------------------------------------
+  mdp_overrides:
+    production:
+      nstxout-compressed: "25000"   # write .xtc every 25 000 steps
+      compressed-x-grps: System     # include all atoms in the trajectory
+
+  # ------------------------------------------------------------------
+  # Retry policy
+  # Retries re-submit the same step with the same inputs.  Set to 0 for
+  # production; investigate cluster failures manually before restarting.
+  # ------------------------------------------------------------------
+  max_retries: 0

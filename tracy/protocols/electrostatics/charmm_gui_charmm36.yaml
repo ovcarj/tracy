@@ -1,0 +1,92 @@
+# Tracy protocol: membrane electrostatic potential — CHARMM-GUI CHARMM36/36m
+#
+# For use with ComputeMembranePotentialWorkChain on trajectories produced by
+# RunMembraneMDWorkChain (or any GROMACS production run with an .xtc output).
+#
+# Requires:
+#   - tpr_file from the production GromacsRunWorkChain
+#   - trajectory_compressed (.xtc) from the same step
+#     (production MDP must have nstxout-compressed > 0)
+#
+# The total potential satisfies Poisson linearity:
+#   φ_SYSTEM(z) = φ_MEMB(z) + φ_Water(z) + φ_ION(z)
+# to within numerical precision.  Any subset of components can be omitted
+# if only the total profile is needed.
+#
+# Residue name conventions (change if using a different force field):
+#   CHARMM36/36m:  water = TIP3,  K+ = POT,  Na+ = SOD,  Cl- = CLA
+#   AMBER:         water = WAT or HOH, K+ = K, Na+ = Na, Cl- = Cl
+#   OPLS:          water = SOL, ions depend on the ion parameters used
+#
+# Validated configuration (CLAUDE.md pk=1894):
+#   GROMACS 2021.7 | CHARMM36m | POPC bilayer | KCl
+#   MEMB −4.3 V, Water +3.4 V, ION +0.18 V, total +0.58 V
+
+tracy:
+  expected_engine: gromacs
+  membrane_normal_axis: z
+
+  # ------------------------------------------------------------------
+  # Trajectory centring (gmx trjconv)
+  # Centres the periodic box on the MEMB group and fixes PBC artefacts.
+  # The output trajectory contains all atoms (SYSTEM).
+  # ------------------------------------------------------------------
+  trjconv_center_group: MEMB
+  trjconv_output_group: SYSTEM
+
+  # ------------------------------------------------------------------
+  # Electrostatic potential slices (gmx potential -sl)
+  # Number of slices along the membrane normal axis.
+  # 200 gives ~0.04 nm/slice for a typical ~8 nm POPC box.
+  # Increase to 400 for thicker membranes (e.g. > 12 nm with protein).
+  # ------------------------------------------------------------------
+  potential_slices: 200
+
+  # ------------------------------------------------------------------
+  # Total potential group
+  # ------------------------------------------------------------------
+  potential_charge_group: SYSTEM
+
+  # ------------------------------------------------------------------
+  # Component groups (optional; each launches one gmx potential run)
+  # Remove a group to skip its contribution.
+  # ------------------------------------------------------------------
+  potential_component_groups:
+    - MEMB
+    - Water
+    - ION
+
+  # ------------------------------------------------------------------
+  # Create Water and ION index groups via gmx select before the analysis.
+  # These are merged into the original .ndx so existing groups are preserved.
+  #
+  # CHARMM36/36m KCl system (Quick Bilayer default):
+  new_index_groups:
+    - '"Water" resname TIP3'       # CHARMM36 TIP3P water
+    - '"ION" resname POT CLA'      # K+ / Cl-   (KCl system)
+  # For NaCl: replace with:
+  #   - '"ION" resname SOD CLA'    # Na+ / Cl-  (NaCl system)
+  # For AMBER: replace with:
+  #   - '"Water" resname WAT'      # or HOH
+  #   - '"ION" resname K Cl'
+  # ------------------------------------------------------------------
+
+  # ------------------------------------------------------------------
+  # Poisson correction (-correct flag for gmx potential)
+  # Removes the net charge contribution (subtracts a linear term from φ(z)).
+  # Required for charged simulation boxes.  Recommended: always true.
+  # ------------------------------------------------------------------
+  potential_correct: true
+
+  # ------------------------------------------------------------------
+  # Symmetrization (post-processing only; not a gmx potential flag)
+  # Averages φ(z) with φ(L−z) to enforce bilayer symmetry.
+  # Use false for:
+  #   - Asymmetric bilayers (different leaflet compositions)
+  #   - Systems under an applied voltage gradient
+  #   - Any trajectory where the two leaflets are not equivalent
+  # Use true for:
+  #   - Pure symmetric bilayers (e.g. DPPC with identical leaflets)
+  #   - When you want to reduce noise by exploiting bilayer symmetry
+  # ------------------------------------------------------------------
+  potential_symmetrize: false
