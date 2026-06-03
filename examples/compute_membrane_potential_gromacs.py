@@ -48,9 +48,13 @@ def main():
     if hasattr(wc.inputs, "index_file"):
         index_file = wc.inputs.index_file
 
-    # Group names must match the index groups in your .ndx file.
-    # Check available groups with: gmx make_ndx -f structure.gro -o /dev/null
-    # CHARMM-GUI Quick Bilayer typically produces: MEMB, Water, ION, SYSTEM
+    # CHARMM-GUI Quick Bilayer default groups: MEMB, SOLV, SYSTEM.
+    # Water and ION do not exist by default; new_index_groups creates them
+    # via gmx select before the potential calculations run.
+    # Residue names depend on the force field and ion type:
+    #   CHARMM36/36m + KCl:  TIP3 / POT / CLA
+    #   CHARMM36/36m + NaCl: TIP3 / SOD / CLA
+    #   AMBER:                WAT (or HOH) / K / Cl
     protocol = orm.Dict({
         "tracy": {
             "membrane_normal_axis": "z",
@@ -58,6 +62,12 @@ def main():
             "trjconv_center_group": "MEMB",    # centre on the membrane
             "trjconv_output_group": "SYSTEM",  # write all atoms
             "potential_charge_group": "SYSTEM",
+            # Create Water and ION index groups before the analysis.
+            # Adjust residue names to match your force field and ion type.
+            "new_index_groups": [
+                '"Water" resname TIP3',       # CHARMM36 TIP3P water
+                '"ION" resname POT CLA',      # K+ = POT, Cl- = CLA (KCl)
+            ],
             # Decompose into per-group contributions (omit to compute total only).
             # By Poisson linearity: φ_MEMB + φ_Water + φ_ION = φ_SYSTEM
             "potential_component_groups": ["MEMB", "Water", "ION"],
