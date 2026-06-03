@@ -6,32 +6,21 @@ AiiDA-based workflow package for building and simulating mitochondrial membrane 
 
 `tracy` orchestrates a multi-step computational workflow for mitochondrial membrane research using [AiiDA](https://www.aiida.net) for provenance tracking and workflow management.
 
-```
-CHARMM-GUI membrane construction  →  BuildMembraneWorkChain
-GROMACS molecular dynamics        →  RunMembraneMDWorkChain
-Electrostatic potential           →  ComputeMembranePotentialWorkChain   ──→  remembrane
-Molecular charge distribution     →  MoleculeChargeDistributionWorkChain ──→  remolecule
-                                                                                   │
-                                      ElectrostaticEnergyWorkChain ←──────────────┘
-                                                                    ──→  retrace
-```
+The pipeline has five WorkChains, each independently testable:
 
-Each stage is a separate, independently testable WorkChain.
+- `BuildMembraneWorkChain` — CHARMM-GUI Quick Bilayer → GROMACS-ready bundle
+- `RunMembraneMDWorkChain` — minimization, staged NPT equilibration, production MD
+- `ComputeMembranePotentialWorkChain` — φ(z) profile from trajectory; stores to `remembrane`
+- `MoleculeChargeDistributionWorkChain` — RDKit conformers → XTB preopt → DFT RESP; stores to `remolecule`
+- `ElectrostaticEnergyWorkChain` — E(z) from φ(z) + RESP charges; stores to `retrace`
 
-The three pipeline stages that produce persistent scientific data each feed a companion
-database (`remembrane`, `remolecule`, `retrace`). Because `retrace` stores one record per
-(molecule, membrane) pair, running the same molecule against multiple membrane compositions
-— or running many molecules against the same membrane — builds a queryable database of
-electrostatic energies. Any combination of records already in `remolecule` and `remembrane`
-can be combined without re-running the underlying QM or MD:
+`MembraneElectrostaticsWorkChain` chains the first three stages in a single submission.
 
-```
-remembrane: POPC  |  POPE/POPC/CL  |  OMM  |  …
-               ↘        ↓               ↙
-remolecule:  FCCP ── aspirin ── niclosamide ── TPP+ ── …
-               ↘        ↓               ↙
-retrace:    E(z) for every (molecule × membrane) combination
-```
+Because `retrace` records reference independent `remembrane` and `remolecule` entries,
+any (molecule, membrane, solvent) combination can be added to the database without
+re-running the underlying MD or QM. Running the same set of molecules against multiple
+membrane compositions — or adding new molecules to an existing membrane dataset — requires
+only the `ElectrostaticEnergyWorkChain` step.
 
 ## Requirements
 
@@ -1014,13 +1003,16 @@ entry (φ(z) profile), so the full provenance chain from SMILES to E(z) is prese
 
 Because records in `remolecule` and `remembrane` are independent of each other,
 any pair of existing entries can be combined into a new `retrace` record without
-re-running any QM or MD. This makes it straightforward to build a reference database
-of electrostatic energies spanning many molecules across many membrane compositions:
+re-running any QM or MD. Running many molecules against a single membrane φ(z) profile,
+or testing one molecule against several membrane compositions, requires only the fast
+`ElectrostaticEnergyWorkChain` step each time.
 
 ```
-remembrane: POPC  |  POPE/CL  |  IMM  |  OMM  |  …
-remolecule: FCCP  |  aspirin  |  TPP+ |  …
-retrace:    E(z) for every (molecule, membrane, solvent) triple
+remembrane: POPC  |  POPE/POPC/CL  |  OMM  |  …
+               ↘        ↓               ↙
+remolecule:  FCCP ── aspirin ── niclosamide ── TPP+ ── …
+               ↘        ↓               ↙
+retrace:    E(z) for every (molecule × membrane) combination
 ```
 
 ```bash
