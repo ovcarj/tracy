@@ -1,10 +1,10 @@
 # tracy
 
-AiiDA-based workflow package for building and simulating mitochondrial membrane systems.
+AiiDA-based workflow package for computing electrostatic interaction energies between biological membranes and drug-like molecules.
 
 ## Overview
 
-`tracy` orchestrates a multi-step computational workflow for mitochondrial membrane research using [AiiDA](https://www.aiida.net) for provenance tracking and workflow management.
+`tracy` orchestrates a multi-step computational workflow for biological membrane research using [AiiDA](https://www.aiida.net) for provenance tracking and workflow management.
 
 The pipeline has five WorkChains, each independently testable:
 
