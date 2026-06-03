@@ -9,11 +9,29 @@ AiiDA-based workflow package for building and simulating mitochondrial membrane 
 ```
 CHARMM-GUI membrane construction  →  BuildMembraneWorkChain
 GROMACS molecular dynamics        →  RunMembraneMDWorkChain
-Electrostatic potential           →  ComputeMembranePotentialWorkChain
-Molecular charge distribution     →  MoleculeChargeDistributionWorkChain
+Electrostatic potential           →  ComputeMembranePotentialWorkChain   ──→  remembrane
+Molecular charge distribution     →  MoleculeChargeDistributionWorkChain ──→  remolecule
+                                                                                   │
+                                      ElectrostaticEnergyWorkChain ←──────────────┘
+                                                                    ──→  retrace
 ```
 
 Each stage is a separate, independently testable WorkChain.
+
+The three pipeline stages that produce persistent scientific data each feed a companion
+database (`remembrane`, `remolecule`, `retrace`). Because `retrace` stores one record per
+(molecule, membrane) pair, running the same molecule against multiple membrane compositions
+— or running many molecules against the same membrane — builds a queryable database of
+electrostatic energies. Any combination of records already in `remolecule` and `remembrane`
+can be combined without re-running the underlying QM or MD:
+
+```
+remembrane: POPC  |  POPE/POPC/CL  |  OMM  |  …
+               ↘        ↓               ↙
+remolecule:  FCCP ── aspirin ── niclosamide ── TPP+ ── …
+               ↘        ↓               ↙
+retrace:    E(z) for every (molecule × membrane) combination
+```
 
 ## Requirements
 
@@ -65,7 +83,7 @@ verdi plugin list aiida.workflows
 # tracy entries: tracy.build_membrane, tracy.gromacs_run, tracy.run_membrane_md,
 #                tracy.compute_membrane_potential, tracy.create_index_groups,
 #                tracy.molecule_charges, tracy.orca_preopt, tracy.orca_opt,
-#                tracy.electrostatic_energy
+#                tracy.electrostatic_energy, tracy.membrane_electrostatics
 verdi plugin list aiida.calculations
 # tracy entries: tracy.trjconv, tracy.potential, tracy.select_groups
 ```
@@ -809,6 +827,141 @@ one `OrcaBaseWorkChain` per structure, and returns the lowest-energy converged r
 
 ---
 
+## ElectrostaticEnergyWorkChain
+
+Computes the 1D electrostatic interaction energy profile E(z) for a molecule
+traversing a membrane along its normal axis.
+
+**Method:** E [eV] = Σᵢ qᵢ [e] · φ(zᵢ) [V], converted to kJ/mol (× 96.485 kJ mol⁻¹ eV⁻¹).
+The molecule is scanned in steps along the membrane normal with its dipole moment
+aligned parallel (or anti-parallel) to the axis. Both orientations are computed.
+The scan range is automatically shrunk so no charge site ever leaves the φ(z) spline
+domain.
+
+**Entry point:** `tracy.electrostatic_energy`
+
+**Inputs**
+
+| Name | Type | Description |
+|---|---|---|
+| `potential_profile` | `SinglefileData` | φ(z) `.xvg` from `ComputeMembranePotentialWorkChain` |
+| `output_parameters` | `Dict` | ORCA output from `MoleculeChargeDistributionWorkChain` (contains `atomcharges['resp']`) |
+| `protocol` | `Dict` | Tracy protocol (see below) |
+
+**Outputs**
+
+| Name | Type | Description |
+|---|---|---|
+| `electrostatic_energy_report` | `Dict` | E(z) arrays, dipole, scan range for +/− orientations |
+
+### Protocol format
+
+```yaml
+tracy:
+  membrane_normal_axis: z
+  charges_model: resp        # key in atomcharges dict
+  z_scan_nm:
+    n_points: 200            # resolution over the valid COM scan range
+    # min: 1.5               # optional: clip scan range (nm)
+    # max: 7.5
+```
+
+### Submitting
+
+```python
+from aiida import load_profile, orm
+from aiida.engine import run_get_node
+
+load_profile()
+
+potential_wc = orm.load_node(<ComputeMembranePotentialWorkChain_pk>)
+molecule_wc  = orm.load_node(<MoleculeChargeDistributionWorkChain_pk>)
+
+protocol = orm.Dict({
+    "tracy": {
+        "membrane_normal_axis": "z",
+        "charges_model": "resp",
+        "z_scan_nm": {"n_points": 200},
+    },
+})
+
+from tracy.workflows.electrostatic_energy import ElectrostaticEnergyWorkChain
+_, wc = run_get_node(
+    ElectrostaticEnergyWorkChain,
+    potential_profile=potential_wc.outputs.potential_profile,
+    output_parameters=molecule_wc.outputs.results["vacuum"].output_parameters,
+    protocol=protocol,
+)
+
+report = wc.outputs.electrostatic_energy_report.get_dict()
+print("min E (+dipole):", report["min_energy_eV_pos"], "eV at z =", report["min_z_nm_pos"], "nm")
+print("min E (-dipole):", report["min_energy_eV_neg"], "eV at z =", report["min_z_nm_neg"], "nm")
+```
+
+Or use the bundled example script:
+
+```bash
+python examples/compute_electrostatic_energy.py
+```
+
+### Storing results and building a cross-membrane database
+
+Each E(z) profile can be stored in [`retrace`](#retrace), which cross-references the
+`remolecule` record for the molecule and the `remembrane` record for the membrane:
+
+```bash
+retrace import aiida --pk <ElectrostaticEnergyWorkChain_pk> \
+    --remolecule ~/.remolecule --remembrane ~/.remembrane
+```
+
+Because `retrace` records are independent of the underlying simulations, any combination
+of molecules and membranes already stored in `remolecule` / `remembrane` can be combined
+without re-running QM or MD. A typical workflow for building a reference database:
+
+1. Simulate several membranes (e.g. POPC, POPE/CL, OMM model) → store each in `remembrane`
+2. Calculate RESP charges for a set of drug candidates → store each in `remolecule`
+3. Run `ElectrostaticEnergyWorkChain` for every (molecule × membrane × solvent) combination
+4. Store all E(z) profiles in `retrace` → query by InChIKey, membrane composition, or charge model
+
+This decoupled design means a new membrane simulation can immediately be cross-referenced
+against all existing molecules in `remolecule`, and vice versa, without repeating any
+calculations.
+
+---
+
+## MembraneElectrostaticsWorkChain
+
+Convenience pipeline that chains `BuildMembraneWorkChain` → `RunMembraneMDWorkChain` →
+`ComputeMembranePotentialWorkChain` in a single daemon-managed submission. A unified
+protocol dict is passed to all three sub-WorkChains; each reads its own keys and ignores
+the rest.
+
+Optional skip inputs allow re-entry at any stage: supply `gromacs_input_bundle` to skip
+CHARMM-GUI, or `tpr_file` + `trajectory_compressed` to skip MD entirely.
+
+**Entry point:** `tracy.membrane_electrostatics`
+
+**Inputs**
+
+| Name | Type | Required | Description |
+|---|---|---|---|
+| `protocol` | `Dict` | yes | Unified protocol covering all three stages |
+| `code` | `AbstractCode` | yes | GROMACS code |
+| `options` | `Dict` | no | Scheduler options (applied to all GROMACS jobs) |
+| `gromacs_input_bundle` | `FolderData` | no | Skip CHARMM-GUI build |
+| `tpr_file` | `SinglefileData` | no | Skip MD (supply with `trajectory_compressed`) |
+| `trajectory_compressed` | `SinglefileData` | no | Skip MD (supply with `tpr_file`) |
+| `index_file` | `SinglefileData` | no | `.ndx` override for the potential step |
+
+**Outputs**: `gromacs_input_bundle` (if built), `md_report` (if MD ran),
+`potential_profile`, `potential_report`, `potential_components.<group>`.
+
+```bash
+python examples/compute_electrostatic_energy.py   # step-by-step
+# or submit the full pipeline:
+python tests/run_membrane_pipeline.py
+```
+
 ---
 
 ## Companion packages
@@ -855,9 +1008,20 @@ remembrane plot <uuid> --components
 Database for electrostatic interaction energies between drug-like molecules and membrane potentials.
 
 `retrace` stores the output of `ElectrostaticEnergyWorkChain` — the E(z) profile
-of a molecule as it moves along the membrane normal, with its dipole oriented in
-both directions. Records cross-reference remolecule and remembrane entries for
-full traceability.
+of a molecule traversing a membrane, with its dipole oriented in both directions.
+Each record cross-references a `remolecule` entry (RESP charges) and a `remembrane`
+entry (φ(z) profile), so the full provenance chain from SMILES to E(z) is preserved.
+
+Because records in `remolecule` and `remembrane` are independent of each other,
+any pair of existing entries can be combined into a new `retrace` record without
+re-running any QM or MD. This makes it straightforward to build a reference database
+of electrostatic energies spanning many molecules across many membrane compositions:
+
+```
+remembrane: POPC  |  POPE/CL  |  IMM  |  OMM  |  …
+remolecule: FCCP  |  aspirin  |  TPP+ |  …
+retrace:    E(z) for every (molecule, membrane, solvent) triple
+```
 
 ```bash
 pip install "git+https://github.com/ovcarj/retrace#egg=retrace[aiida]"
