@@ -23,11 +23,11 @@ dependencies = [
     "aiida-core>=2.5,<3",
     "aiida-charmm-gui",
     "scipy>=1.7",
+    "rdkit>=2023.3",
 ]
 
 [project.optional-dependencies]
 gromacs = ["aiida-gromacs"]
-rdkit = ["rdkit>=2023.3"]
 orca = ["aiida-orca"]
 dev = [
     "pytest>=7.0",
@@ -54,6 +54,7 @@ dev = [
 "tracy.orca_preopt"                = "tracy.workflows.orca_preopt:OrcaPreoptWorkChain"
 "tracy.orca_opt"                   = "tracy.workflows.orca_opt:OrcaOptWorkChain"
 "tracy.electrostatic_energy"       = "tracy.workflows.electrostatic_energy:ElectrostaticEnergyWorkChain"
+"tracy.membrane_electrostatics"    = "tracy.workflows.membrane_pipeline:MembraneElectrostaticsWorkChain"
 
 [tool.hatch.version]
 path = "tracy/__init__.py"
