@@ -58,15 +58,16 @@ pip install -e "git+https://github.com/ovcarj/aiida-orca.git@update-orca-parser#
 The `aiida-orca` fork (`update-orca-parser` branch) is required — the PyPI version does not
 support ORCA 6 RESP charges or XTB energy parsing.
 
-Register the AiiDA entry points after installation:
+Verify that AiiDA has discovered the entry points (other installed plugins also appear):
 
 ```bash
 verdi plugin list aiida.workflows
-# membrane: tracy.build_membrane, tracy.gromacs_run, tracy.run_membrane_md,
-#           tracy.compute_membrane_potential, tracy.create_index_groups
-# charges:  tracy.molecule_charges, tracy.orca_preopt, tracy.orca_opt
+# tracy entries: tracy.build_membrane, tracy.gromacs_run, tracy.run_membrane_md,
+#                tracy.compute_membrane_potential, tracy.create_index_groups,
+#                tracy.molecule_charges, tracy.orca_preopt, tracy.orca_opt,
+#                tracy.electrostatic_energy
 verdi plugin list aiida.calculations
-# should show: tracy.trjconv, tracy.potential, tracy.select_groups
+# tracy entries: tracy.trjconv, tracy.potential, tracy.select_groups
 ```
 
 ---
