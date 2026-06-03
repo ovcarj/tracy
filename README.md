@@ -16,11 +16,23 @@ The pipeline has five WorkChains, each independently testable:
 
 `MembraneElectrostaticsWorkChain` chains the first three stages in a single submission.
 
+Results feed three independent companion databases — [`remembrane`](https://github.com/ovcarj/remembrane),
+[`remolecule`](https://github.com/ovcarj/remolecule), and [`retrace`](https://github.com/ovcarj/retrace)
+— each installable and queryable on its own, without requiring a running AiiDA instance.
+The long-term goal is a queryable reference of electrostatic interaction energies covering
+many drug-like molecules across multiple membrane compositions:
+
+```
+remembrane: POPC  |  POPE/POPC/CL  |  OMM  |  …
+               ↘        ↓               ↙
+remolecule:  FCCP ── aspirin ── niclosamide ── TPP+ ── …
+               ↘        ↓               ↙
+retrace:    E(z) for every (molecule × membrane) combination
+```
+
 Because `retrace` records reference independent `remembrane` and `remolecule` entries,
-any (molecule, membrane, solvent) combination can be added to the database without
-re-running the underlying MD or QM. Running the same set of molecules against multiple
-membrane compositions — or adding new molecules to an existing membrane dataset — requires
-only the `ElectrostaticEnergyWorkChain` step.
+any (molecule, membrane, solvent) combination can be added without re-running the
+underlying MD or QM.
 
 ## Requirements
 
@@ -1006,14 +1018,6 @@ any pair of existing entries can be combined into a new `retrace` record without
 re-running any QM or MD. Running many molecules against a single membrane φ(z) profile,
 or testing one molecule against several membrane compositions, requires only the fast
 `ElectrostaticEnergyWorkChain` step each time.
-
-```
-remembrane: POPC  |  POPE/POPC/CL  |  OMM  |  …
-               ↘        ↓               ↙
-remolecule:  FCCP ── aspirin ── niclosamide ── TPP+ ── …
-               ↘        ↓               ↙
-retrace:    E(z) for every (molecule × membrane) combination
-```
 
 ```bash
 pip install "git+https://github.com/ovcarj/retrace#egg=retrace[aiida]"
