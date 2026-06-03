@@ -48,6 +48,7 @@ For GROMACS MD and electrostatics (optional):
 - GROMACS 2021.7
 
 For molecular charge distribution (optional):
+- [RDKit](https://www.rdkit.org) ≥2023.3 — conformer generation (included in the default install)
 - [aiida-orca](https://github.com/ovcarj/aiida-orca/tree/update-orca-parser), branch `update-orca-parser` (fork of ezpzbz/aiida-orca)
   — contains two fixes required for ORCA 6 + XTB support: RESP charge extraction from
   `RESP Charges` output section (commit `4bad37f`), and XTB energy parsing for ORCA 6
