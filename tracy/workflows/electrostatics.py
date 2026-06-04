@@ -231,7 +231,7 @@ class ComputeMembranePotentialWorkChain(WorkChain):
     def should_run_convergence_check(self) -> bool:
         return bool(self.ctx.convergence_check and self.ctx.total_sim_time_ps is not None)
 
-    def run_convergence_calculations(self) -> None:
+    def run_convergence_calculations(self) -> ToContext:
         """Submit two additional gmx potential jobs truncated at 50% and 75% of total time."""
         t_total = self.ctx.total_sim_time_ps
         trajectory = self.ctx.preprocessing.outputs.trajectory
@@ -251,8 +251,7 @@ class ComputeMembranePotentialWorkChain(WorkChain):
         self.report(
             f"Submitted convergence checks: 50% (pk={calc_50.pk}), 75% (pk={calc_75.pk})"
         )
-        self.ctx.convergence_calc_50 = calc_50
-        self.ctx.convergence_calc_75 = calc_75
+        return ToContext(convergence_calc_50=calc_50, convergence_calc_75=calc_75)
 
     def results(self) -> ExitCode | None:
         all_groups = [self.ctx.charge_group] + list(self.ctx.component_groups)
