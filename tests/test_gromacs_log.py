@@ -53,7 +53,7 @@ _MINIMIZATION_LOG = """\
 
 def test_parse_simulation_time():
     result = parse_gromacs_log_summary(_MD_LOG_AVERAGES)
-    assert abs(result["simulation_time_ns"] - 100.0) < 1e-9
+    assert abs(result["simulation_time_ps"] - 100.0) < 1e-9
 
 
 def test_parse_conserved_energy_drift():

@@ -13,7 +13,8 @@ def parse_gromacs_log_summary(log_content: str) -> dict:
 
     Returns a dict with the following keys (all optional — minimization logs
     lack temperature/pressure averages):
-      simulation_time_ns                 — from 'Energy conservation' line
+      simulation_time_ps                 — from 'Energy conservation' line (value is in ps;
+                                          GROMACS 2021 reports ps but labels the unit as 'ns')
       conserved_energy_drift_kJmolps_per_atom
       n_steps, n_frames                  — from 'Statistics over' line
       avg_temperature_K                  — average from AVERAGES section
@@ -27,7 +28,7 @@ def parse_gromacs_log_summary(log_content: str) -> dict:
         log_content,
     )
     if m:
-        result["simulation_time_ns"] = float(m.group(1))
+        result["simulation_time_ps"] = float(m.group(1))
 
     m = re.search(
         r"Conserved energy drift:\s*([-+]?\d[\d.]*(?:[eE][-+]?\d+)?)\s*kJ/mol/ps per atom",

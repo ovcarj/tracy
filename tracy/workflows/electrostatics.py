@@ -139,9 +139,9 @@ class ComputeMembranePotentialWorkChain(WorkChain):
             steps = self.inputs.md_report.get_dict().get("steps_run", [])
             if steps:
                 summary = steps[-1].get("quality", {}).get("summary", {})
-                sim_ns = summary.get("simulation_time_ns")
-                if sim_ns is not None:
-                    self.ctx.total_sim_time_ps = float(sim_ns) * 1000.0
+                sim_ps = summary.get("simulation_time_ps")
+                if sim_ps is not None:
+                    self.ctx.total_sim_time_ps = float(sim_ps)
 
         self.report(
             f"Setup: engine={engine}, axis={self.ctx.axis}, slices={self.ctx.n_slices}, "
