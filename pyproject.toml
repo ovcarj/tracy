@@ -21,14 +21,14 @@ keywords = ["aiida", "plugin", "membrane", "molecular-dynamics", "charmm-gui"]
 requires-python = ">=3.11"
 dependencies = [
     "aiida-core>=2.5,<3",
-    "aiida-charmm-gui",
+    "aiida-charmm-gui @ git+https://github.com/ovcarj/aiida-charmm-gui.git",
     "scipy>=1.7",
     "rdkit>=2023.3",
 ]
 
 [project.optional-dependencies]
-gromacs = ["aiida-gromacs"]
-orca = ["aiida-orca"]
+gromacs = ["aiida-gromacs @ git+https://github.com/ovcarj/aiida-gromacs.git@fix-itp-dirs-upload"]
+orca    = ["aiida-orca @ git+https://github.com/ovcarj/aiida-orca.git@update-orca-parser"]
 dev = [
     "pytest>=7.0",
     "pyyaml",

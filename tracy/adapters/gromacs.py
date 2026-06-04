@@ -218,8 +218,14 @@ def submit_potential_preprocessing(wc, *, trajectory, tpr_file, center_group,
 
 def submit_potential_calculation(wc, *, trajectory, tpr_file, charge_group,
                                  n_slices, axis, symmetrize, correct,
-                                 index_file, options):
-    """Submit PotentialCalculation for a single charge group."""
+                                 index_file, options,
+                                 begin_time_ps=None, end_time_ps=None):
+    """Submit PotentialCalculation for a single charge group.
+
+    Optional ``begin_time_ps`` / ``end_time_ps`` restrict the trajectory time range
+    analysed (passed as ``-b`` / ``-e`` to ``gmx potential``).
+    """
+    from aiida.orm import Float as AiidaFloat
     from tracy.calculations.potential import PotentialCalculation
 
     inputs = {
@@ -235,6 +241,10 @@ def submit_potential_calculation(wc, *, trajectory, tpr_file, charge_group,
     }
     if index_file is not None:
         inputs["index_file"] = index_file
+    if begin_time_ps is not None:
+        inputs["begin_time_ps"] = AiidaFloat(begin_time_ps)
+    if end_time_ps is not None:
+        inputs["end_time_ps"] = AiidaFloat(end_time_ps)
     return wc.submit(PotentialCalculation, **inputs)
 
 

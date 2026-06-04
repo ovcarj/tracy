@@ -99,6 +99,9 @@ class RunMembraneMDWorkChain(WorkChain):
 
         spec.output("md_results", valid_type=orm.FolderData)
         spec.output("md_report",  valid_type=orm.Dict)
+        spec.output_namespace("step_quality", valid_type=orm.Dict,
+                               required=False, dynamic=True,
+                               help="Per-step quality check results keyed by step prefix.")
 
         spec.exit_code(400, "ERROR_UNSUPPORTED_ENGINE", message="MD engine is not supported.")
         spec.exit_code(401, "ERROR_MANIFEST_INVALID",   message="Could not build a valid step manifest.")
@@ -227,6 +230,22 @@ class RunMembraneMDWorkChain(WorkChain):
         last_wc = self.ctx.current_step_wc
 
         md_results = self._collect_outputs_as_folder(last_wc)
+
+        from tracy.calculations.gromacs_log import check_step_quality
+        quality_issues = []
+        for step in self.ctx.completed_steps:
+            step_wc = orm.load_node(step["pk"])
+            quality = check_step_quality(step_wc.outputs.log, self.inputs.protocol)
+            step["quality"] = quality.get_dict()
+            # Expose as named output so quality nodes are reachable from this WorkChain
+            self.out(f"step_quality.{step['prefix']}", quality)
+            if not step["quality"]["passed"]:
+                quality_issues.append((step["name"], step["quality"]["warnings"]))
+
+        if quality_issues:
+            for name, warnings in quality_issues:
+                for w in warnings:
+                    self.report(f"Quality warning [{name}]: {w}")
 
         self.out("md_results", md_results.store())
         self.out("md_report", orm.Dict({

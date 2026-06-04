@@ -162,6 +162,13 @@ def compute_electrostatic_energy(
         'n_atoms': int(len(atomnos)),
         'dipole_magnitude_D': float(dipole_norm * _ENM_TO_DEBYE),
         'dipole_direction': ddir,
+        'model_description': (
+            "Fixed-charge 1D electrostatic interaction score: E(z) = Σ_i q_i φ(z + r_i,axis). "
+            "Assumes rigid geometry, dipole-aligned orientation, fixed partial charges. "
+            "Ignores desolvation, polarization, membrane deformation, lateral diffusion. "
+            "Not a PMF or permeation free energy."
+        ),
+        'method_reference': 'doi:10.1039/d4ob00252k',
     }
 
     for sign_label, sign in (('pos', 1), ('neg', -1)):

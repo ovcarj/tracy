@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from aiida.common import CalcInfo, CodeInfo
 from aiida.engine import CalcJob, ExitCode
-from aiida.orm import Bool, Int, SinglefileData, Str
+from aiida.orm import Bool, Float, Int, SinglefileData, Str
 from aiida.parsers import Parser
 
 
@@ -40,6 +40,10 @@ class PotentialCalculation(CalcJob):
                         "gmx potential 2021 has no -symm flag; averaging is done at plot time.")
         spec.input("correct",      valid_type=Bool, default=lambda: Bool(True),
                    help="Apply -correct flag (charge correction, recommended)")
+        spec.input("begin_time_ps", valid_type=Float, required=False,
+                   help="Start time for analysis in ps (-b flag). Default: trajectory start.")
+        spec.input("end_time_ps",   valid_type=Float, required=False,
+                   help="End time for analysis in ps (-e flag). Default: trajectory end.")
 
         spec.output("potential_xvg", valid_type=SinglefileData, help="Potential profile (.xvg)")
 
@@ -72,6 +76,10 @@ class PotentialCalculation(CalcJob):
             cmdline += ["-n", self.inputs.index_file.filename]
         if self.inputs.correct.value:
             cmdline.append("-correct")
+        if "begin_time_ps" in self.inputs:
+            cmdline += ["-b", str(self.inputs.begin_time_ps.value)]
+        if "end_time_ps" in self.inputs:
+            cmdline += ["-e", str(self.inputs.end_time_ps.value)]
 
         codeinfo = CodeInfo()
         codeinfo.cmdline_params = cmdline

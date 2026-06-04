@@ -155,6 +155,14 @@ class MembraneElectrostaticsWorkChain(WorkChain):
 
         self.out("md_report", wc.outputs.md_report)
 
+        # Log quality warnings from any step (quality check runs inline in RunMembraneMDWorkChain)
+        report = wc.outputs.md_report.get_dict()
+        for step in report.get("steps_run", []):
+            quality = step.get("quality", {})
+            if quality and not quality.get("passed", True):
+                for w in quality.get("warnings", []):
+                    self.report(f"MD quality warning [{step['name']}]: {w}")
+
         # Find the production (last completed) GromacsRunWorkChain.
         report = wc.outputs.md_report.get_dict()
         production_pk = report["steps_run"][-1]["pk"]
@@ -211,6 +219,9 @@ class MembraneElectrostaticsWorkChain(WorkChain):
             index_file = self.inputs.index_file
         if index_file is not None:
             inputs["index_file"] = index_file
+
+        if hasattr(self.ctx, "md_wc") and hasattr(self.ctx.md_wc.outputs, "md_report"):
+            inputs["md_report"] = self.ctx.md_wc.outputs.md_report
 
         wc = self.submit(ComputeMembranePotentialWorkChain, **inputs)
         self.report(f"Submitted ComputeMembranePotentialWorkChain pk={wc.pk}")

@@ -236,6 +236,33 @@ def test_valid_scan_range_all_atoms_in_same_direction():
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# scan_electrostatic_energy — golden-value regression
+# ---------------------------------------------------------------------------
+
+
+def test_scan_golden_values_linear_potential():
+    """E(z) = q × φ(z) exactly for linear φ(z)=z and a point charge at origin."""
+    z = np.linspace(0.0, 8.0, 200)
+    spline = build_spline(z, z.copy())
+    coords = np.array([[0.0, 0.0, 0.0]])
+    charges = np.array([2.0])
+    energies = scan_electrostatic_energy(np.array([1.0, 2.5, 5.0]), coords, charges, spline, axis=2)
+    np.testing.assert_allclose(energies, [2.0, 5.0, 10.0], atol=1e-10)
+
+
+def test_scan_golden_values_quadratic_potential():
+    """Cubic spline reproduces z² exactly; dipole molecule gives analytically known E."""
+    z = np.linspace(0.0, 8.0, 200)
+    spline = build_spline(z, z ** 2)
+    # +1 at z=+0.1 nm, -1 at z=-0.1 nm
+    coords = np.array([[0.0, 0.0, 0.1], [0.0, 0.0, -0.1]])
+    charges = np.array([1.0, -1.0])
+    # E(z_com=3.0) = 1×(3.1)² − 1×(2.9)² = 9.61 − 8.41 = 1.20 eV
+    energies = scan_electrostatic_energy(np.array([3.0]), coords, charges, spline, axis=2)
+    np.testing.assert_allclose(energies, [1.20], atol=1e-8)
+
+
 def test_scan_uniform_potential():
     z = np.linspace(0, 5, 50)
     phi = np.ones(50) * 3.0
@@ -356,3 +383,21 @@ def test_workchain_has_report_output():
     from tracy.workflows.electrostatic_energy import ElectrostaticEnergyWorkChain
     outputs = ElectrostaticEnergyWorkChain.spec().outputs
     assert 'electrostatic_energy_report' in outputs
+
+
+def test_report_contains_model_description(aiida_profile):
+    from aiida import orm
+    from tracy.calculations.electrostatic_energy import compute_electrostatic_energy
+
+    xvg = _make_xvg_node()
+    params = orm.Dict(_make_output_parameters())
+    params.store()
+    protocol = orm.Dict(_make_protocol())
+    protocol.store()
+
+    result = compute_electrostatic_energy(xvg, params, protocol)
+    d = result.get_dict()
+    assert 'model_description' in d
+    assert 'PMF' in d['model_description']
+    assert 'method_reference' in d
+    assert 'd4ob00252k' in d['method_reference']
