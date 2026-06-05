@@ -56,6 +56,13 @@ def test_parse_simulation_time():
     assert abs(result["simulation_time_ps"] - 100.0) < 1e-9
 
 
+def test_parse_simulation_time_scientific_notation():
+    # GROMACS 2021 uses 1e+06 for long runs (1 μs)
+    log = "Energy conservation over simulation part #1 of length 1e+06 ns, time 0 to 1e+06 ns\n"
+    result = parse_gromacs_log_summary(log)
+    assert abs(result["simulation_time_ps"] - 1e6) < 1.0
+
+
 def test_parse_conserved_energy_drift():
     result = parse_gromacs_log_summary(_MD_LOG_AVERAGES)
     assert abs(result["conserved_energy_drift_kJmolps_per_atom"] - (-2.50e-3)) < 1e-9

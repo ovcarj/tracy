@@ -24,7 +24,7 @@ def parse_gromacs_log_summary(log_content: str) -> dict:
     result: dict = {}
 
     m = re.search(
-        r"Energy conservation over simulation part #\d+ of length ([\d.]+) ns",
+        r"Energy conservation over simulation part #\d+ of length ([0-9.eE+\-]+) ns",
         log_content,
     )
     if m:
