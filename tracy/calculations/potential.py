@@ -9,6 +9,7 @@ from aiida.parsers import Parser
 
 
 _OUTPUT_XVG = "potential.xvg"
+_OUTPUT_CHARGE_XVG = "charge.xvg"
 _STDOUT = "potential.out"
 
 
@@ -46,6 +47,7 @@ class PotentialCalculation(CalcJob):
                    help="End time for analysis in ps (-e flag). Default: trajectory end.")
 
         spec.output("potential_xvg", valid_type=SinglefileData, help="Potential profile (.xvg)")
+        spec.output("charge_xvg",    valid_type=SinglefileData, help="Charge density profile (.xvg)")
 
         spec.outputs.dynamic = True
         spec.exit_code(300, "ERROR_MISSING_OUTPUT_FILES",
@@ -69,6 +71,7 @@ class PotentialCalculation(CalcJob):
             "-f", self.inputs.trajectory.filename,
             "-s", self.inputs.tpr_file.filename,
             "-o", _OUTPUT_XVG,
+            "-oc", _OUTPUT_CHARGE_XVG,
             "-d", self.inputs.axis.value,
             "-sl", str(self.inputs.n_slices.value),
         ]
@@ -91,7 +94,7 @@ class PotentialCalculation(CalcJob):
         calcinfo = CalcInfo()
         calcinfo.codes_info = [codeinfo]
         calcinfo.local_copy_list = input_files
-        calcinfo.retrieve_list = [_STDOUT, _OUTPUT_XVG]
+        calcinfo.retrieve_list = [_STDOUT, _OUTPUT_XVG, _OUTPUT_CHARGE_XVG]
         return calcinfo
 
 
@@ -107,5 +110,9 @@ class PotentialParser(Parser):
 
         with self.retrieved.open(_OUTPUT_XVG, "rb") as fh:
             self.out("potential_xvg", SinglefileData(file=fh, filename=_OUTPUT_XVG))
+
+        if _OUTPUT_CHARGE_XVG in files_retrieved:
+            with self.retrieved.open(_OUTPUT_CHARGE_XVG, "rb") as fh:
+                self.out("charge_xvg", SinglefileData(file=fh, filename=_OUTPUT_CHARGE_XVG))
 
         return ExitCode(0)
