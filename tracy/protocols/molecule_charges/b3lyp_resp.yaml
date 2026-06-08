@@ -1,0 +1,101 @@
+# Tracy protocol: molecular charge distribution — B3LYP/def2-SVP + RESP
+#
+# For use with MoleculeChargeDistributionWorkChain.
+#
+# Pipeline:
+#   1. RDKit ETKDG — generate N conformers (local, synchronous)
+#   2. Parallel XTB2 geometry optimisation per conformer (pre-opt)
+#   3. Top-K structures ranked by energy proceed to DFT
+#   4. Parallel B3LYP/def2-SVP OPT + RESP per structure
+#   5. Lowest-energy conformer and RESP charges returned
+#
+# Outputs are namespaced by solvent: results.vacuum.*, results.water.*
+# Add or remove entries from tracy.solvents as needed.
+#
+# Validated: ethanol (CCO), vacuum + CPCM(water), AiiDA pk=5664.
+#
+# QC engine: ORCA 6.  Requires aiida-orca from the fork:
+#   pip install -e "git+https://github.com/ovcarj/aiida-orca.git@update-orca-parser#egg=aiida-orca"
+#
+# Usage (Python):
+#   import yaml
+#   from aiida import orm
+#   from aiida.engine import submit
+#   from tracy.workflows.molecule_charges import MoleculeChargeDistributionWorkChain
+#
+#   protocol = orm.Dict(yaml.safe_load(open("b3lyp_resp.yaml")))
+#   wc = submit(
+#       MoleculeChargeDistributionWorkChain,
+#       smiles=orm.Str("CCO"),
+#       protocol=protocol,
+#       code=orm.load_code("orca@cluster"),
+#       options=orm.Dict({
+#           "resources": {"num_machines": 1, "num_mpiprocs_per_machine": 4},
+#           "queue_name": "your_queue",
+#           "max_wallclock_seconds": 7200,
+#           "withmpi": False,
+#       }),
+#   )
+
+tracy:
+  # ------------------------------------------------------------------
+  # Conformer generation
+  # ------------------------------------------------------------------
+  conformer_engine: rdkit   # RDKit ETKDG; runs locally as a calcfunction
+  n_conformers: 20          # starting geometries; increase for flexible rings
+  random_seed: 42
+
+  # ------------------------------------------------------------------
+  # QC engine
+  # ------------------------------------------------------------------
+  expected_engine: orca
+
+  # ------------------------------------------------------------------
+  # Solvents
+  # null = vacuum (no CPCM); string values use ORCA's CPCM model.
+  # Each solvent runs a full preopt+opt cycle and produces an independent
+  # set of RESP charges.  Results appear under outputs.results.<key>
+  # where the key is "vacuum" for null and the solvent name otherwise.
+  # ------------------------------------------------------------------
+  solvents:
+    - null       # vacuum
+    - Water      # CPCM(Water)
+
+  # ------------------------------------------------------------------
+  # Pre-optimisation (XTB2)
+  # ------------------------------------------------------------------
+  run_preopt: true    # set false to skip XTB; submit all conformers to DFT
+  preopt_top_k: 5     # top-K lowest-energy XTB structures passed to DFT
+
+  # ------------------------------------------------------------------
+  # Molecular charge and spin state
+  # ------------------------------------------------------------------
+  charge: 0
+  multiplicity: 1
+
+# ------------------------------------------------------------------
+# QC engine settings
+# nproc MUST equal num_mpiprocs_per_machine in the scheduler options.
+# ORCA manages its own MPI (withmpi: false in AiiDA); slot mismatch
+# causes ORCA's internal mpirun to fail at runtime.
+# ------------------------------------------------------------------
+orca:
+  preopt:
+    method: XTB2
+    input_blocks:
+      pal:
+        nproc: 4   # match num_mpiprocs_per_machine in options
+
+  opt:
+    method: B3LYP
+    basis: def2-SVP
+    dispersion: D3BJ
+
+    # Use ORCA 6 native RESP keyword.  Produces atomcharges['resp'] in
+    # the parsed output.  Do not use CHELPG unless you specifically need
+    # that charge scheme — it produces atomcharges['chelpg'] instead.
+    resp_keyword: RESP
+
+    input_blocks:
+      pal:
+        nproc: 4   # match num_mpiprocs_per_machine in options

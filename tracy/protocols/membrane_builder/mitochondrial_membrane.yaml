@@ -206,20 +206,7 @@ charmm_gui:
     # ff converter.  API field: charmm_mini.  Default: false.
     charmm_mini: false
 
-    # ------------------------------------------------------------------
-    # Advanced / rarely changed
-    # ------------------------------------------------------------------
-    topology_in: true           # include N-terminal patch  (API: topologyIn)
-    heteroatoms: false          # include heteroatoms from PDB  (API: heteroatoms)
-    clone_job: false            # clone job for multi-composition runs  (API: clone_job)
-    ppm: false                  # use PPM for protein positioning  (API: ppm)
-    prot_projection_upper: false  # protein projection on upper leaflet
-    prot_projection_lower: false  # protein projection on lower leaflet
-    align_option: 1             # protein alignment method  (API: align_option)
-    hetero_xy_option: margin    # XY box size rule for heteroatoms  (API: hetero_xy_option)
-
 tracy:
   expected_engine: gromacs
   membrane_normal_axis: z
   require_gromacs_files: true
-  output_interface_version: "0.1"

@@ -63,8 +63,19 @@ tracy:
   # ------------------------------------------------------------------
   mdp_overrides:
     production:
-      nstxout-compressed: "25000"   # write .xtc every 25 000 steps
+      # CHARMM-GUI step7_production.mdp typically sets nsteps = 500 000
+      # (1 ns at 2 fs, or 2 ns at 4 fs with HMR).  Override here for the
+      # intended production length, e.g.:
+      #   200 ns  at 2 fs → nsteps = 100 000 000
+      #   200 ns  at 4 fs → nsteps =  50 000 000
+      #   1 μs    at 4 fs → nsteps = 250 000 000
+      #   3 μs    at 4 fs → nsteps = 750 000 000
+      nsteps: "50000000"            # 200 ns at dt = 0.004 ps (HMR); adjust as needed
+      nstxout-compressed: "25000"   # frame every 100 ps (at 4 fs) → 2 000 frames/200 ns
       compressed-x-grps: System     # include all atoms in the trajectory
+      nstxout: "0"
+      nstvout: "0"
+      nstenergy: "5000"
 
   # ------------------------------------------------------------------
   # Retry policy

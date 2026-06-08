@@ -1,0 +1,52 @@
+# Tracy protocol: electrostatic energy profile E(z)
+#
+# For use with ElectrostaticEnergyWorkChain.
+#
+# Computes E(z) = Σ_i q_i φ(z + r_i,axis) for a molecule scanned along the
+# membrane normal.  Both dipole orientations are evaluated.  The COM scan
+# range is auto-shrunk so the membrane potential spline is never extrapolated.
+#
+# Inputs:
+#   potential_profile  — .xvg from ComputeMembranePotentialWorkChain
+#   output_parameters  — orm.Dict from MoleculeChargeDistributionWorkChain
+#                        (contains atomcharges['resp'] and atom positions)
+#
+# Usage (Python):
+#   import yaml
+#   from aiida import orm
+#   from aiida.engine import run_get_node
+#   from tracy.workflows.electrostatic_energy import ElectrostaticEnergyWorkChain
+#
+#   protocol = orm.Dict(yaml.safe_load(open("default.yaml")))
+#   _, wc = run_get_node(
+#       ElectrostaticEnergyWorkChain,
+#       potential_profile=potential_wc.outputs.potential_profile,
+#       output_parameters=molecule_wc.outputs.results["vacuum"].output_parameters,
+#       protocol=protocol,
+#   )
+#   report = wc.outputs.electrostatic_energy_report.get_dict()
+
+tracy:
+  membrane_normal_axis: z
+
+  # ------------------------------------------------------------------
+  # Charge model
+  # Reads atomcharges[charges_model] from output_parameters.
+  # 'resp'    — RESP-fitted charges (recommended; most suitable for
+  #             electrostatic interaction energies)
+  # 'mulliken' / 'loewdin' — Mulliken/Löwdin population charges
+  #             (less physically meaningful for this application)
+  # ------------------------------------------------------------------
+  charges_model: resp
+
+  # ------------------------------------------------------------------
+  # COM scan along the membrane normal
+  # ------------------------------------------------------------------
+  z_scan_nm:
+    n_points: 200   # scan resolution; 200 gives a smooth E(z) curve
+
+    # Optional: clip to a sub-range (nm).
+    # The scan range is already auto-shrunk to avoid spline extrapolation;
+    # these provide additional user-defined bounds if needed.
+    # min: 1.0
+    # max: 7.0
