@@ -206,6 +206,20 @@ charmm_gui:
     # ff converter.  API field: charmm_mini.  Default: false.
     charmm_mini: false
 
+    # ------------------------------------------------------------------
+    # Protein embedding — untested, pure-lipid builds only for now
+    # ------------------------------------------------------------------
+    # jobid_pdb: "XXXXXXXX"         # CHARMM-GUI PDB Reader job ID
+    # membrane_only: false          # set true to embed a protein
+    # ppm: false                    # use PPM server for protein positioning
+    # align_option: 1               # protein alignment method
+    # prot_projection_upper: false  # project protein onto upper leaflet
+    # prot_projection_lower: false  # project protein onto lower leaflet
+    # heteroatoms: false            # include heteroatoms from PDB
+    # hetero_xy_option: margin      # XY box size rule when heteroatoms present
+    # topology_in: true             # include N-terminal patch
+    # clone_job: false              # clone job for multi-composition runs
+
 tracy:
   expected_engine: gromacs
   membrane_normal_axis: z
