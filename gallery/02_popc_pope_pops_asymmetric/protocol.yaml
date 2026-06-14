@@ -1,0 +1,90 @@
+# Gallery example 2: asymmetric POPC / POPE:POPS bilayer
+# End-to-end: CHARMM-GUI build → GROMACS MD → electrostatic potential
+#
+# Submitted with submit.py → MembraneElectrostaticsWorkChain
+# Result: potential.png
+#
+# Mimics the plasma-membrane lipid asymmetry: phosphatidylcholine (PC) on the
+# outer leaflet; phosphatidylethanolamine (PE) + phosphatidylserine (PS) 3:1 on
+# the inner leaflet.  POPS carries a net −1e charge per molecule, breaking the
+# bilayer symmetry and producing a large transmembrane electrostatic asymmetry
+# visible in the component-decomposed potential profile.
+
+system:
+  name: popc_pope_pops_asymmetric
+  description: >-
+    Asymmetric bilayer: pure POPC outer leaflet (~302 lipids), POPE:POPS 3:1
+    inner leaflet (~335 lipids). Large lateral patch (~14×14 nm).
+    CHARMM36m, HMR (4 fs timestep), 310.15 K, 0.15 M KCl, 1 µs production.
+
+# ── CHARMM-GUI membrane build ──────────────────────────────────────────────────
+charmm_gui:
+  module: membrane_builder
+
+  quick_bilayer:
+    upper: "POPC=1"           # outer leaflet: pure PC (zwitterionic)
+    lower: "POPE:POPS=3:1"    # inner leaflet: PE + PS (PS is anionic, −1e)
+
+    margin: 70.0      # larger patch to accommodate lipid number mismatch
+    wdist: 22.5       # water layer thickness per side in Å
+    ion_conc: 0.15    # M KCl; K+ screens the negatively charged inner leaflet
+    ion_type: KCl
+    membrane_only: true
+    run_ff_converter: true
+    temperature: 310.15       # K
+
+    charmmff_hmr_checked: true   # hydrogen mass repartitioning (4 fs timestep)
+    charmmff_wyf_checked: false
+    charmm_mini: false
+
+# ── GROMACS MD + electrostatic potential ──────────────────────────────────────
+tracy:
+  expected_engine: gromacs
+  membrane_normal_axis: z
+  require_gromacs_files: true
+
+  # MD pipeline: CHARMM-GUI 8-step sequence
+  md_steps:
+    - minimization
+    - equilibration
+    - equilibration
+    - equilibration
+    - equilibration
+    - equilibration
+    - equilibration
+    - production
+
+  mdp_overrides:
+    production:
+      nsteps: "250000000"         # 1 µs at 4 fs timestep
+      nstxout: "0"
+      nstvout: "0"
+      nstenergy: "5000"
+      nstxout-compressed: "25000" # write XTC every 100 ps
+      compressed-x-grps: System
+
+  # Electrostatic potential analysis
+  trjconv_center_group: MEMB
+  trjconv_output_group: System
+
+  potential_charge_group: System
+  potential_slices: 200
+  potential_correct: true
+  potential_symmetrize: false     # asymmetric bilayer — do not symmetrise
+
+  # Split SOLV into Water and ION.  Residue names for CHARMM36 + KCl:
+  #   water → TIP3  |  K+ → POT  |  Cl- → CLA
+  new_index_groups:
+    - '"Water" resname TIP3'
+    - '"ION" resname POT CLA'
+
+  # φ(System) = φ(MEMB) + φ(Water) + φ(ION)
+  # For asymmetric membranes the MEMB profile is not symmetric: the POPS-rich
+  # inner leaflet dominates with a large negative contribution, while the neutral
+  # POPC outer leaflet contributes a smaller positive dipole term.
+  potential_component_groups:
+    - MEMB
+    - Water
+    - ION
+
+  potential_convergence_check: true

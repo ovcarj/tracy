@@ -1,0 +1,86 @@
+# Gallery example 1: symmetric POPC bilayer
+# End-to-end: CHARMM-GUI build → GROMACS MD → electrostatic potential
+#
+# Submitted with submit.py → MembraneElectrostaticsWorkChain
+# Result: potential.png
+
+system:
+  name: popc_symmetric
+  description: >-
+    Symmetric POPC bilayer (~256 lipids per leaflet). Pure zwitterionic reference.
+    CHARMM36m, HMR (4 fs timestep), 310.15 K, 0.15 M KCl, 1 µs production.
+
+# ── CHARMM-GUI membrane build ──────────────────────────────────────────────────
+charmm_gui:
+  module: membrane_builder
+
+  quick_bilayer:
+    upper: "POPC=1"
+    lower: "POPC=1"
+
+    margin: 65.0      # box boundary margin in Å; controls lateral patch size
+    wdist: 22.5       # water layer thickness per side in Å
+    ion_conc: 0.15    # M KCl
+    ion_type: KCl
+    membrane_only: true
+    run_ff_converter: true    # generate GROMACS-ready topology and MDP files
+    temperature: 310.15       # K
+
+    charmmff_hmr_checked: true   # hydrogen mass repartitioning (enables 4 fs timestep)
+    charmmff_wyf_checked: false
+    charmm_mini: false
+
+# ── GROMACS MD + electrostatic potential ──────────────────────────────────────
+tracy:
+  expected_engine: gromacs
+  membrane_normal_axis: z
+  require_gromacs_files: true
+
+  # MD pipeline: CHARMM-GUI 8-step sequence (1 minimisation + 6 equilibration + production)
+  md_steps:
+    - minimization
+    - equilibration
+    - equilibration
+    - equilibration
+    - equilibration
+    - equilibration
+    - equilibration
+    - production
+
+  # MDP overrides applied on top of the CHARMM-GUI defaults.
+  # Only the production step needs changes: enable XTC output and set run length.
+  mdp_overrides:
+    production:
+      nsteps: "250000000"         # 1 µs at 4 fs timestep
+      nstxout: "0"                # suppress full-precision trajectory
+      nstvout: "0"
+      nstenergy: "5000"
+      nstxout-compressed: "25000" # write XTC every 100 ps
+      compressed-x-grps: System
+
+  # Electrostatic potential analysis (gmx potential via Poisson integration)
+  trjconv_center_group: MEMB      # centre the membrane in the box before analysis
+  trjconv_output_group: System
+
+  potential_charge_group: System
+  potential_slices: 200
+  potential_correct: true
+  potential_symmetrize: true      # apply bilateral symmetrisation (valid for symmetric bilayers)
+
+  # CHARMM-GUI Quick Bilayer creates MEMB, SOLV, SYSTEM index groups.
+  # new_index_groups splits SOLV into Water and ION for component decomposition.
+  # Residue names for CHARMM36 + KCl:
+  #   water → TIP3  |  K+ → POT  |  Cl- → CLA
+  new_index_groups:
+    - '"Water" resname TIP3'
+    - '"ION" resname POT CLA'
+
+  # Compute per-group potentials in parallel; by Poisson linearity:
+  # φ(System) = φ(MEMB) + φ(Water) + φ(ION)
+  potential_component_groups:
+    - MEMB
+    - Water
+    - ION
+
+  # Run gmx potential on 0–50 % and 0–75 % of the trajectory to assess convergence.
+  potential_convergence_check: true
