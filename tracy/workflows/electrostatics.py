@@ -36,7 +36,12 @@ class ComputeMembranePotentialWorkChain(WorkChain):
     index_file            : SinglefileData — .ndx (optional)
     protocol              : Dict           — tracy protocol (see below)
     code                  : AbstractCode   — registered gmx code
-    options               : Dict           — scheduler options (optional)
+    options               : Dict           — scheduler options for all calcs (optional)
+    analysis_options      : Dict           — scheduler options for lightweight analysis calcs
+                                             (trjconv, gmx select, gmx potential); overrides
+                                             ``options`` when provided.  Use this to submit
+                                             analysis jobs to a short-walltime queue or with
+                                             fewer MPI ranks than the production MD.
 
     Protocol keys (all under ``tracy``):
       expected_engine          : MD engine (default: "gromacs")
@@ -67,6 +72,10 @@ class ComputeMembranePotentialWorkChain(WorkChain):
         spec.input("protocol",              valid_type=orm.Dict)
         spec.input("code",                  valid_type=orm.AbstractCode)
         spec.input("options",               valid_type=orm.Dict, required=False)
+        spec.input("analysis_options",      valid_type=orm.Dict, required=False,
+                   help="Scheduler options for lightweight analysis calcs (trjconv, gmx select, "
+                        "gmx potential).  Overrides 'options' for those calcs so they can run "
+                        "on a short-walltime queue or with fewer MPI ranks than the MD job.")
         spec.input("md_report",             valid_type=orm.Dict,           required=False,
                    help="RunMembraneMDWorkChain md_report; embedded in potential_report for provenance.")
         spec.input("total_simulation_time_ps", valid_type=orm.Float,       required=False,
@@ -187,8 +196,9 @@ class ComputeMembranePotentialWorkChain(WorkChain):
         }
         if self.ctx.index_file is not None:
             inputs["index_file"] = self.ctx.index_file
-        if "options" in self.inputs:
-            inputs["options"] = self.inputs.options
+        opts_node = self._analysis_options_node()
+        if opts_node is not None:
+            inputs["options"] = opts_node
 
         wc = self.submit(CreateIndexGroupsWorkChain, **inputs)
         self.report(f"Submitted CreateIndexGroupsWorkChain (pk={wc.pk})")
@@ -346,6 +356,16 @@ class ComputeMembranePotentialWorkChain(WorkChain):
 
     # -------------------------------------------------------------------------
 
+    def _analysis_options_node(self) -> orm.Dict | None:
+        """Return the Dict node for analysis scheduler options, falling back to options."""
+        if "analysis_options" in self.inputs:
+            return self.inputs.analysis_options
+        if "options" in self.inputs:
+            return self.inputs.options
+        return None
+
     def _serial_options(self) -> dict:
-        base = self.inputs.options.get_dict() if "options" in self.inputs else {}
+        """Return scheduler options dict for serial analysis calcs (withmpi forced False)."""
+        node = self._analysis_options_node()
+        base = node.get_dict() if node is not None else {}
         return {**base, "withmpi": False}

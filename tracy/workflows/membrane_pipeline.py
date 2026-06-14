@@ -24,7 +24,13 @@ class MembraneElectrostaticsWorkChain(WorkChain):
     ------
     protocol              : Dict           — unified protocol (all stages)
     code                  : AbstractCode   — GROMACS code
-    options               : Dict           — scheduler options (optional)
+    options               : Dict           — scheduler options for MD calcs (optional)
+    analysis_options      : Dict           — scheduler options for lightweight analysis calcs
+                                             (trjconv, gmx select, gmx potential); overrides
+                                             ``options`` for those calcs.  Use this to avoid
+                                             queuing minutes-long analysis jobs behind days-long
+                                             production runs.  If omitted, ``options`` is used
+                                             for all stages.
     gromacs_input_bundle  : FolderData     — skip CHARMM-GUI build (optional)
     tpr_file              : SinglefileData — skip MD; supply with trajectory_compressed (optional)
     trajectory_compressed : SinglefileData — skip MD; supply with tpr_file (optional)
@@ -46,6 +52,10 @@ class MembraneElectrostaticsWorkChain(WorkChain):
         spec.input("protocol",              valid_type=orm.Dict)
         spec.input("code",                  valid_type=orm.AbstractCode)
         spec.input("options",               valid_type=orm.Dict,            required=False)
+        spec.input("analysis_options",      valid_type=orm.Dict,            required=False,
+                   help="Scheduler options for lightweight analysis calcs (trjconv, gmx select, "
+                        "gmx potential).  Overrides 'options' for those calcs so they can run on "
+                        "a short-walltime queue or with fewer MPI ranks than the MD job.")
         spec.input("gromacs_input_bundle",  valid_type=orm.FolderData,      required=False)
         spec.input("tpr_file",              valid_type=orm.SinglefileData,  required=False)
         spec.input("trajectory_compressed", valid_type=orm.SinglefileData,  required=False)
@@ -211,7 +221,9 @@ class MembraneElectrostaticsWorkChain(WorkChain):
             "protocol":              self.inputs.protocol,
             "code":                  self.inputs.code,
         }
-        if "options" in self.inputs:
+        if "analysis_options" in self.inputs:
+            inputs["analysis_options"] = self.inputs.analysis_options
+        elif "options" in self.inputs:
             inputs["options"] = self.inputs.options
 
         index_file = getattr(self.ctx, "index_file", None)
