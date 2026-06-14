@@ -36,27 +36,11 @@ underlying MD or QM.
 
 ## Gallery
 
-Complete end-to-end examples live in `gallery/`. Each directory contains a protocol YAML,
-a submission script, and the electrostatic potential plot produced by that run.
+The `gallery/` directory contains end-to-end examples with protocols, submission scripts,
+and output plots:
 
-### Symmetric POPC bilayer — `gallery/01_popc_symmetric/`
-
-Pure POPC, ~256 lipids per leaflet, 0.15 M KCl, 1 µs.
-Top: total φ(z) decomposed into membrane, water, and ion contributions.
-Bottom: convergence of φ(z) computed on 50 %, 75 %, and 100 % of the trajectory.
-
-![POPC symmetric electrostatic potential](gallery/01_popc_symmetric/potential.png)
-
-### Asymmetric POPC / POPE:POPS bilayer — `gallery/02_popc_pope_pops_asymmetric/`
-
-POPC outer leaflet / POPE:POPS 3:1 inner leaflet (~14×14 nm patch), 0.15 M KCl, 1 µs.
-POPS carries a net −1e charge per molecule, breaking the bilateral symmetry: the membrane
-component φ(z) is large and negative on the POPS-rich inner leaflet and positive on the
-neutral POPC outer leaflet.
-
-![Asymmetric POPC/POPE:POPS electrostatic potential](gallery/02_popc_pope_pops_asymmetric/potential.png)
-
----
+- [`gallery/01_popc_symmetric/`](gallery/01_popc_symmetric/) — symmetric POPC bilayer, 1 µs
+- [`gallery/02_popc_pope_pops_asymmetric/`](gallery/02_popc_pope_pops_asymmetric/) — asymmetric POPC outer / POPE:POPS 3:1 inner leaflet, 1 µs
 
 ## Requirements
 
