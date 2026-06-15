@@ -20,7 +20,7 @@ Energies in kJ mol⁻¹; +dip and −dip refer to the two dipole orientations re
 membrane normal.  fm is included for completeness; the gallery plot shows mofm only for
 clarity.
 
-| Molecule | Solvent | μ (D) | POPC +dip | POPC −dip | Asym +dip | Asym −dip |
+| Molecule | Solvent | μ (D) | POPC +dip (kJ/mol) | POPC −dip (kJ/mol) | Asym +dip (kJ/mol) | Asym −dip (kJ/mol) |
 |---|---|---:|---:|---:|---:|---:|
 | fm | vacuum | 11.4 | −10.1 | −10.1 | −10.0 | −10.7 |
 | fm | CPCM water | 19.3 | −18.3 | −18.4 | −18.2 | −18.6 |
