@@ -1,0 +1,50 @@
+# Gallery example 3: RESP charge distribution for fm (Ar-CF₃ compound)
+# Molecule: C₂₂H₁₆F₃NO₃S — sulfonyl chromophore with NMe₂ donor and Ar-CF₃ acceptor
+# End-to-end: RDKit conformers → XTB2 pre-opt → B3LYP/def2-SVP OPT + RESP
+#
+# Submitted with submit.py → MoleculeChargeDistributionWorkChain
+# Result: structure.png (PBE0-D4 RESP analysis from a related study)
+#
+# The CF₃ group carries ≈ 0 net charge (C ≈ +0.45 e, 3×F ≈ −0.48 e);
+# the ring carbon it hangs off is slightly negative (−0.11 e RESP).
+# See NJ_CF3_withdrawal_report.md for the full analysis.
+
+system:
+  name: fm
+  description: >-
+    Sulfonyl chromophore with NMe₂ donor and Ar-CF₃ group.
+    Formula C₂₂H₁₆F₃NO₃S, charge 0, singlet.
+    Used to study whether CF₃ injects net δ+ charge onto the adjacent ring.
+
+tracy:
+  conformer_engine: rdkit    # RDKit ETKDG conformer generation
+  expected_engine: orca      # XTB2 pre-opt + DFT OPT + RESP via ORCA
+
+  n_conformers: 10           # ETKDG conformers; molecule is largely rigid (aromatic scaffold)
+  random_seed: 42
+  run_preopt: true           # XTB2 pre-opt to rank conformers before DFT
+  preopt_top_k: 3            # top-3 lowest-energy XTB structures passed to DFT
+
+  charge: 0
+  multiplicity: 1
+
+  # Run charges in vacuum and CPCM water; results namespaced by solvent key.
+  solvents:
+    - null          # vacuum
+    - Water         # CPCM implicit solvent
+
+orca:
+  preopt:
+    method: XTB2
+    input_blocks:
+      pal:
+        nproc: 64   # must match num_mpiprocs_per_machine in scheduler options
+
+  opt:
+    method: B3LYP
+    basis: def2-SVP
+    dispersion: D3BJ
+    resp_keyword: RESP      # ORCA 6 native RESP; produces atomcharges['resp']
+    input_blocks:
+      pal:
+        nproc: 64

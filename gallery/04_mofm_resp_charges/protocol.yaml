@@ -1,0 +1,50 @@
+# Gallery example 4: RESP charge distribution for mofm (Ar-CF₃ + OMe compound)
+# Molecule: C₂₃H₁₈F₃NO₄S — same scaffold as fm with an added OMe donor on the CF₃-phenyl ring
+# End-to-end: RDKit conformers → XTB2 pre-opt → B3LYP/def2-SVP OPT + RESP
+#
+# Submitted with submit.py → MoleculeChargeDistributionWorkChain
+# Result: structure.png (PBE0-D4 RESP analysis from a related study)
+#
+# Adding the OMe donor para to CF₃ leaves the CF₃ group charge unchanged (net ≈ 0 e);
+# the ring ipso carbon rises to ≈ 0.00 e (vs −0.11 in fm), reflecting the cancelling
+# local bonding effects of two opposing substituents — not long-range charge transfer.
+
+system:
+  name: mofm
+  description: >-
+    Sulfonyl chromophore with NMe₂ donor, Ar-CF₃ acceptor, and an additional OMe
+    group para to CF₃ on the pendant phenyl ring.
+    Formula C₂₃H₁₈F₃NO₄S, charge 0, singlet.
+    Comparison compound to fm: tests whether an OMe donor alters CF₃ group charge.
+
+tracy:
+  conformer_engine: rdkit
+  expected_engine: orca
+
+  n_conformers: 10
+  random_seed: 42
+  run_preopt: true
+  preopt_top_k: 3
+
+  charge: 0
+  multiplicity: 1
+
+  solvents:
+    - null          # vacuum
+    - Water         # CPCM implicit solvent
+
+orca:
+  preopt:
+    method: XTB2
+    input_blocks:
+      pal:
+        nproc: 64
+
+  opt:
+    method: B3LYP
+    basis: def2-SVP
+    dispersion: D3BJ
+    resp_keyword: RESP
+    input_blocks:
+      pal:
+        nproc: 64

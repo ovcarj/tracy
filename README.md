@@ -37,10 +37,15 @@ underlying MD or QM.
 ## Gallery
 
 The `gallery/` directory contains end-to-end examples with protocols, submission scripts,
-and output plots:
+and output figures.
 
+**Membrane electrostatics** (`MembraneElectrostaticsWorkChain`):
 - [`gallery/01_popc_symmetric/`](gallery/01_popc_symmetric/) — symmetric POPC bilayer, 1 µs
 - [`gallery/02_popc_pope_pops_asymmetric/`](gallery/02_popc_pope_pops_asymmetric/) — asymmetric POPC outer / POPE:POPS 3:1 inner leaflet, 1 µs
+
+**Molecular RESP charges** (`MoleculeChargeDistributionWorkChain`):
+- [`gallery/03_fm_resp_charges/`](gallery/03_fm_resp_charges/) — fm (C₂₂H₁₆F₃NO₃S): sulfonyl chromophore with NMe₂ donor and Ar-CF₃
+- [`gallery/04_mofm_resp_charges/`](gallery/04_mofm_resp_charges/) — mofm (C₂₃H₁₈F₃NO₄S): same scaffold with additional OMe donor on the CF₃-phenyl ring
 
 ## Requirements
 

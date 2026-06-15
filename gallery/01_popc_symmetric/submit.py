@@ -18,6 +18,23 @@ Monitor progress:
 
     verdi process show <pk>
     verdi process report <pk>
+
+After completion, store the potential profile in remembrane:
+
+    # Find the ComputeMembranePotentialWorkChain pk in the Called section:
+    verdi process show <pk>
+
+    remembrane import aiida --pk <compute_membrane_potential_pk>
+
+    remembrane list
+    remembrane show <uuid>
+
+    # If remembrane cannot resolve the BuildMembraneWorkChain automatically
+    # (e.g. standalone submission outside MembraneElectrostaticsWorkChain),
+    # pass it explicitly:
+    remembrane import aiida \\
+        --pk <compute_membrane_potential_pk> \\
+        --build-membrane-pk <build_membrane_pk>
 """
 
 from __future__ import annotations
