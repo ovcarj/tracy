@@ -19,3 +19,5 @@ mofm against both membranes (galleries 01–04 combined).  Rows: POPC symmetric 
 POPC/POPE:POPS asymmetric (bottom).  Columns: +dipole and −dipole orientation.
 Line colour encodes molecule (red = fm, blue = mofm); line style encodes solvent
 (solid = CPCM water, dashed = vacuum).
+
+<img src="ez_fm_mofm_by_orient.png" width="700"/>
